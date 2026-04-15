@@ -1,0 +1,797 @@
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 12, DECEMBER 2025
+12357
+Learning to Explore Efﬁciently: Heterogeneous
+Topological Graphs and Lightweight Global
+Reasoning for Robotic Exploration
+Zhi Li
+, Kairao Zheng
+, Yiqing Yuan
+, Junlong Huang
+, Xiaoxun Zhang
+, Student Member, IEEE,
+Jinze Wu
+, and Hui Cheng
+, Member, IEEE
+Abstract—Autonomous exploration in large-scale, unknown en-
+vironments remains a signiﬁcant challenge in mobile robotics.
+In this letter, we propose a scalable exploration framework that
+integrates heterogeneous topological representations, lightweight
+global-local graph reasoning, and reinforcement learning. Our
+framework is computationally efﬁcient, comprehensively consid-
+ers global spatial context, and generalizes effectively across di-
+verse environmental scenarios. We introduce a compact topological
+abstraction to encode crucial spatial and semantic information,
+substantially reducing map complexity. A novel hybrid inference
+module, combining linear global attention with local graph con-
+volutions, effectively integrates long-range exploration with com-
+prehensive local coverage. We further design a minimalist reward
+functionpairedwithacurriculumlearningtoensurestabletraining
+and enhanced generalization. A viewpoint-based action masking
+mechanism further reﬁnes the action space, accelerating learning
+convergence. Extensive simulations demonstrate our method con-
+sistently surpasses state-of-the-art baselines, achieving up to 14.5%
+shorter exploration time and 18.8% reduced path length while
+maintaining low computational overhead. Real-world experiments
+further validate the practical effectiveness of our approach for
+robotic exploration tasks.
+Index Terms—Autonomous systems, motion and path planning,
+reinforcement learning.
+I. INTRODUCTION
+A
+UTONOMOUS exploration in large, unstructured envi-
+ronments is a fundamental challenge in mobile robotics,
+Received 25 May 2025; accepted 7 October 2025. Date of publication 17
+October 2025; date of current version 24 October 2025. This article was
+recommended for publication by Associate Editor P. Falco and Editor J. Kober
+upon evaluation of the reviewers’ comments. This work was supported by the
+National Key R&D Program of China under Grant 2022ZD0119602. (Zhi Li
+and Kairao Zheng contributed equally to this work.) (Corresponding author:
+Hui Cheng.)
+Zhi Li is with the School of Systems Science and Engineering, Sun Yat-sen
+University, Guangzhou 510275, China.
+Kairao Zheng, Yiqing Yuan, Xiaoxun Zhang, and Hui Cheng are with
+the School of Computer Science and Engineering, Sun Yat-sen University,
+Guangzhou 510006, China (e-mail: chengh9@mail.sysu.edu.cn).
+Junlong Huang is with the School of Intelligent Systems Engineering, Sun
+Yat-sen University, Guangzhou 510006, China.
+Jinze Wu is with the Department of Electronics and Telecommunications,
+Politecnico di Torino, 10129 Turin, Italy, and also with the School of Automation
+and Intelligent Manufacturing, Southern University of Science and Technology,
+Shenzhen 518055, China.
+This
+article
+has
+supplementary
+downloadable
+material
+available
+at
+https://doi.org/10.1109/LRA.2025.3622906, provided by the authors.
+Digital Object Identiﬁer 10.1109/LRA.2025.3622906
+with applications in search and rescue, industrial inspection, and
+environmental monitoring [1], [2]. Despite decades of progress,
+designing exploration systems that are both computationally
+efﬁcient and behaviorally robust remains a challenging task.
+Classical frontier-based methods [3], [4], [5] address this chal-
+lenge by decomposing the task into frontier detection, viewpoint
+selection, and path planning, providing an interpretable frame-
+work for exploration. However, these methods incur substantial
+computational overhead as the environment expands.
+To improve scalability, recent research explores learning-
+based approaches, particularly Deep Reinforcement Learning
+(DRL) [6], [7], which optimizes exploration policies through
+interaction with the environment. DRL demonstrates strong
+performance in long-horizon decision making under partial
+observability. However, sparse and delayed rewards and the
+absence of structured priors hinder policy learning in large
+environments [8]. Furthermore, existing methods often overlook
+geometric information embedded in environmental topology,
+leading to inefﬁcient exploration and limited generalization.
+Bridging the gap between the structure-aware reasoning and
+the ﬂexibility of learning-based policies thus remains a pressing
+challenge.
+In this letter, we propose a scalable graph-based exploration
+framework that integrates heterogeneous graph representations
+with global-local reasoning and RL. The main contributions are
+summarized as follows.
+r Heterogeneous Graph Abstraction: We design a compact
+yet expressive topological representation of the environ-
+ment,withdiversenodetypes(frontiers,borders,skeletons,
+viewpoints) that encode distinct spatial and semantic roles.
+This abstraction reduces the complexity of large-scale
+maps while preserving critical cues such as connectivity,
+visibility, and coverage gain.
+r Global-Local Graph Inference Module: We develop a hy-
+brid graph neural network (GNN) that combines linear
+global attention with local graph convolution. This enables
+efﬁcient O(N) reasoning while preserving structural bias,
+allowing the policy to balance long-range exploration with
+low computation.
+r Sparse Reward Optimization via Curriculum Learning:
+We design a minimalist reward function with path cost
+and terminal completion terms. This avoids complex
+2377-3766 © 2025 IEEE. All rights reserved, including rights for text and data mining, and training of artiﬁcial intelligence and similar technologies.
+Personal use is permitted, but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on October 29,2025 at 10:04:51 UTC from IEEE Xplore.  Restrictions apply. 
+12358
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 12, DECEMBER 2025
+reward shaping and hand-tuned weights, preventing reward
+hacking. To improve training efﬁciency and generalization,
+we adopt a curriculum learning that gradually increases
+decision frequency.
+r Viewpoint-Based Action Masking: We apply classical
+viewpoint extraction to constrain the action space to infor-
+mative viewpoints. This mitigates over-squashing effects
+from neighbor-based selection. It also ensures task com-
+pletion and signiﬁcantly accelerates learning by reducing
+variance and improving sample efﬁciency.
+Extensive experiments in diverse large-scale scenarios show
+that our framework improves exploration performance, respon-
+siveness, and generalization over state-of-the-art methods. Our
+method reduces exploration time by up to 14.5% and path
+length by up to 18.8% in complex environments, while main-
+taining high-frequency decision-making capabilities with low
+computational overhead, highlighting its efﬁciency and practical
+effectiveness for real-time exploration.
+II. RELATED WORK
+A. Exploration-Oriented Map Representations
+Efﬁcient spatial representation is crucial to robotic explo-
+ration. Dense occupancy grids are costly in large-scale envi-
+ronments [9], leading to sparse alternatives such as Euclidean
+Signed Distance Fields (ESDF) [10], topological graphs [11],
+and skeleton-based maps [12]. Skeleton-based methods, espe-
+cially those from Hamilton-Jacobi formulations, capture naviga-
+ble pathways with minimal redundancy. Frontier-based explo-
+ration leverages topological abstractions to simplify viewpoint
+selection and planning [4], [5], [13]. However, homogeneous
+representations cannot distinguish between frontiers, borders,
+and viewpoints, limiting their expressiveness. To address this,
+we introduce a heterogeneous representation that explicitly en-
+codes different node types, improving both structural clarity and
+semantic precision.
+B. Efﬁcient Graph-Based Reasoning Methods
+GNNs,
+including
+Graph
+Convolutional
+Networks
+(GCNs) [14], Graph Attention Networks (GATs) [15], and
+Transformer-based models [16], have shown promise in
+navigation
+and
+exploration.
+However,
+traditional
+GNNs
+often encounter quadratic complexity and issues such as
+over-smoothing and over-squashing [17]. Recent variants
+like Linear Transformers and Graph Linear Attention [18],
+[19] reduce complexity to linear order. However, these
+approaches may compromise local structural bias or remain
+inefﬁcient
+in
+complex
+real-world scenarios.
+To
+address
+this, we propose a hybrid graph reasoning architecture
+that combines linear-complexity global attention with local
+graph convolutions, capturing long-range dependencies while
+preserving local structure, improving inference efﬁciency and
+scalability for real-time exploration in large-scale environments.
+C. Action Space Design for Exploration
+The design of the action space strongly affects the efﬁciency
+of RL-based exploration methods. Neighbor-based action selec-
+tion, which uses adjacent nodes in a topological map [7]. leads
+to long decision sequences and unstable policy training under
+sparse rewards. In dense graphs, it further causes over-squashing
+[17], reducing learning efﬁciency. In contrast, viewpoint-based
+action selection samples a limited set of informative viewpoints,
+reducing decision sequence length and ensuring exploration
+completion [13], [20], which alleviates sparse rewards and
+over-squashing. Inspired by these advantages, we introduce a
+viewpoint-based action mask that integrates classical viewpoint
+extraction into RL, constraining the action space to ensure task
+completeness and improve stability by addressing challenges
+related to sparse rewards and information compression.
+D. Sparse Reward Optimization and Curriculum Learning
+Sparse rewards pose a signiﬁcant challenge in RL-based ex-
+ploration when feedback is rare [21]. Go-Explore [22] mitigates
+this by revisiting promising states, while other approaches use
+coverage rewards [23], curiosity [24], or hand-tuned reward
+functions [25], which risk reward hacking and limited gener-
+alization [26]. Curriculum learning, which incrementally in-
+creases task complexity during training, has shown effectiveness
+in improving RL stability and generalization [27]. To address
+these issues, we propose a minimalist reward function consisting
+only of a path cost and a terminal completion reward, avoiding
+intricate reward shaping and minimizing reward hacking. Addi-
+tionally, we introduce a straightforward curriculum that gradu-
+ally increases decision frequency to enhance training stability,
+policy generalization, and overall exploration performance.
+III. PRELIMINARIES
+We formulate autonomous exploration as a Partially Observ-
+able Markov Decision Process (POMDP) and describe the scene
+representation and reward design.
+A. POMDP Formulation
+Autonomous exploration task is to ﬁnd the shortest path that
+covers all traversable areas of an unknown environment while
+incrementally updating a belief map. We formulate this as a
+POMDP ⟨S, A, P, O, R, γ⟩, where S is the full state space, O the
+partial observations from sensors (e.g., LiDAR), A the discrete
+action set of candidate waypoints, P(s′|s, a) the state-transition
+model, R(s, a, s′) the reward function, and γ ∈[0, 1) the dis-
+count factor.
+We represent the environment as a topological graph G =
+(V, E) to bridge the sim-to-real gap when processing raw sensor
+data. The state s corresponds to the global topological map
+that captures the complete spatial information. This graph ef-
+ﬁciently encodes the environment where nodes v ∈V capture
+key attributes (e.g., frontier values, traversability metrics) and
+edges e ∈E represent feasible paths. The observation O at
+each decision step is the current topological graph built from
+the robot’s partial knowledge. The action space A consists of
+selecting the next node to visit, simplifying planning compared
+to dense map representations. The reward function combines
+distance cost and completion bonus:
+R(s, a, s′) = −λ · Rc(s, s′) + Rf(s′),
+(1)
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on October 29,2025 at 10:04:51 UTC from IEEE Xplore.  Restrictions apply. 
+LI et al.: LEARNING TO EXPLORE EFFICIENTLY: HETEROGENEOUS TOPOLOGICAL GRAPHS AND LIGHTWEIGHT GLOBAL REASONING
+12359
+Fig. 1.
+Overview of the proposed exploration framework. (a) Heterogeneous graph construction: Incremental abstraction from occupancy grid to topological graph
+through boundary deﬁnition, skeleton extraction, and viewpoint insertion, producing semantically distinct node types (frontier, border, skeleton, viewpoint). (b)
+Graph-based inference framework: A lightweight encoder-decoder architecture combining linear global attention and local graph convolution efﬁciently generates
+embeddings, aggregates global context, and selects optimal viewpoints via an attention-guided action mask.
+where Rc(s, s′) is the path cost, and Rf(s′) is the ﬁnal comple-
+tion reward. Parameter λ ensures λ · Rc < γT Rf, prioritizing
+exploration completion over minimizing path length, where T
+denotes the truncation horizon.
+B. Heterogeneous Graph-Based Topological Mapping
+To preserve rich environmental information while minimiz-
+ing redundant nodes, we represent the environment as a het-
+erogeneous graph G = (V, E, T), where V denotes vertices, E
+denotes edges (vi, vj) connecting these vertices, and T denotes
+predeﬁned vertex types. Each vertex vi ∈V is associated with
+an attribute vector u tailored to its speciﬁc role. Here, we
+focus explicitly on distinguishing vertex types and ignore edge
+attributes.
+1) Vertex Extraction: Starting from a 2D occupancy grid
+map classiﬁed into free, occupied, and unknown cells, we build
+a heterogeneous graph by extracting key vertices V in three
+steps: deﬁning boundaries, extracting skeleton, and inserting
+viewpoints. First, we deﬁne two types of boundary vertices (see
+Fig. 1): Frontier vertices vf, extracted from free cells adjacent
+to unknown cells, marking exploration frontiers, and Border
+vertices vb, extracted from free cells adjacent to occupied cells,
+indicating traversability boundaries. Next, inspired by [12], we
+extract Skeleton vertices vk by deriving a Hamilton-Jacobi
+skeleton (see Fig. 1) from the occupancy grid’s ESDF, which
+identiﬁes essential pathways in free space. Finally, following the
+classical frontier-based exploration strategy [20], we compute
+Viewpoints vv that strategically observe unexplored regions.
+This structured approach ensures compactness and semantic
+clarity for effective exploration planning.
+2) Edge Construction: With V deﬁned, we establish the
+edges E to ensure connectivity. We generate candidate edges
+by performing a Delaunay triangulation over the entire node
+set using the CGAL library [28], providing a well-distributed
+set of connections. Each edge is then validated by collision
+checking against the occupancy grid, and those intersecting
+occupied or unknown cells are removed. This deterministic
+ﬁltering procedure eliminates invalid or redundant connections
+while preserving essential pathways, resulting in a sparse yet
+well-connected roadmap suitable for exploration.
+3) Vertex Attributes: Each vertex type is assigned a concise
+attribute vector u tailored for decision-making. Frontier (vf)
+and border (vb) store spatial coordinates u = [x, y], sufﬁcient
+for marking transitions to unknown or obstructed areas. Skeleton
+vertices additionally include ESDF-based clearance information
+u = [x, y, d]. Lastly, viewpoint vertices (vv) encode observation
+utility as u = [x, y, ϵ], where ϵ quantiﬁes potential exploration
+gain. This tailored attribute structure enriches the graph repre-
+sentation without redundancy, enhancing exploration effective-
+ness and planning efﬁciency.
+IV. SCALABLE GRAPH-BASED INFERENCE FRAMEWORK
+A. Framework Overview
+We propose a scalable encoder–decoder framework for
+robotic exploration (Fig. 1). The encoder combines a linear
+global attention mechanism [19] with local graph convolutions
+to capture both long-range and local spatial contexts in O(N)
+time, while the decoder applies attention-based action selection
+constrained by a viewpoint-based action mask. This design
+ensureslinearscalabilityandrobustdecision-makingincomplex
+environments.
+B. Encoder
+We ﬁrst encode vertex attributes uv into a latent embedding
+h(0)
+v
+= ft(uv), where t = T(v), and ft is a type-speciﬁc MLP.
+The resulting embeddings, h(0) ∈RN×d, form the basis for
+subsequent computations.
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on October 29,2025 at 10:04:51 UTC from IEEE Xplore.  Restrictions apply. 
+12360
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 12, DECEMBER 2025
+To efﬁciently capture global interactions, we adopt a lin-
+ear global attention mechanism. Unlike conventional softmax
+attention with O(N 2) complexity [29], our method operates
+in linear time, O(N), enabling scalable reasoning on large
+graphs. Speciﬁcally, given initial embeddings h(0), we compute
+normalized query, key, and value matrices:
+Q = fQ
+
+h(0)
+,
+˜Q =
+Q
+∥Q∥F
+,
+K = fK
+
+h(0)
+,
+˜K =
+K
+∥K∥F
+,
+V = fV
+
+h(0)
+,
+(2)
+where fQ, fK, fV are linear transformations, and ∥· ∥F denotes
+the Frobenius norm. Node embeddings are updated efﬁciently
+using a diagonal normalization matrix D:
+D = diag
+
+1 + 1
+N
+˜Q( ˜K⊤1)
+
+,
+(3)
+hg = βD−1
+
+V + 1
+N
+˜Q( ˜K⊤V)
+
++ (1 −β)h(0),
+(4)
+where 1 ∈RN is an all-ones vector, and β is a hyperparameter
+balancing global attention and residual connections. This design
+effectively captures long-range dependencies while preserving
+localstructuralintegrity,makingitparticularlysuitableforlarge-
+scale graph-based exploration.
+To effectively incorporate local structural constraints from the
+graph adjacency matrix A, we fuse the global embeddings hg
+with local graph convolutional updates. Speciﬁcally, we employ
+a simple yet efﬁcient approach:
+ho = (1 −α) hg + α GN
+
+h(0), A
+	
+,
+(5)
+where GN(·) denotes a scalable GCN [14], α balances global
+attention and local connectivity, and the resulting embeddings
+ho = [hv]N
+v=1 serve as inputs to the decoder. This integration
+ensures the model simultaneously captures global structural
+relationships and local graph connectivity, enhancing inference
+quality for exploration tasks.
+C. Decoder
+The decoder aims to produce a global graph-level embedding
+from the node-level embeddings ho. To intuitively aggregate
+global information, we adopt a global attention mechanism [29],
+in which the embedding of the robot’s current vertex hc ∈ho
+naturally serves as the query:
+hagg = Attn(hc, ho).
+(6)
+This approach effectively summarizes the global context by
+weighting node embeddings according to their relevance to
+the robot’s current position, capturing essential structural and
+semantic information for subsequent decision-making. The re-
+sulting graph-level embedding hagg is then jointly utilized by
+the policy head to determine the next action and by the value
+Algorithm 1: Curriculum-Based PPO Training.
+1:
+Input: total episodes N, PPO hyperparameters
+2:
+Stage allocation: N × (0.625, 0.125, 0.125, 0.125)
+3:
+Frequencies: (1: full, 2: 0.125 Hz, 3: 0.5 Hz, 4: 2 Hz)
+4:
+for episode = 1 to N do
+5:
+determine stage s by index; run episode with
+frequency of s
+6:
+collect trajectories D, compute advantages with GAE
+7:
+update policy πθ and value Vφ using PPO
+8:
+end for
+9:
+return trained policy πθ
+head to estimate expected returns, ensuring coherent exploration
+strategies.
+D. Action Selection and Value Estimation
+Given the graph-level embedding hagg from the decoder, we
+employ a single-head attention mechanism to determine the next
+action. Speciﬁcally, we compute relevance scores between hagg
+and candidate vertex embeddings:
+logits(v) = h⊤
+aggho[v],
+v ∈A,
+(7)
+where A denotes the set of feasible actions. Action probabilities
+are then obtained via softmax normalization.
+To improve learning efﬁciency and alleviate over-squashing
+in dense graphs, we introduce a viewpoint-based action mask.
+Unlike conventional adjacency-based masks, our method selec-
+tively retains only informative viewpoints—vertices expected
+to signiﬁcantly reveal unexplored areas—resulting in a compact
+and semantically meaningful action set. This targeted pruning
+accelerates policy convergence and enhances exploration effec-
+tiveness.
+Simultaneously, the value head estimates expected re-
+turns from the shared embedding hagg using a lightweight
+MLP. This shared representation facilitates joint optimiza-
+tion of immediate action quality and long-term explo-
+ration performance, improving both coherence and sample
+efﬁciency.
+E. RL With Curriculum Learning Strategy
+We train our exploration policy using Proximal Policy Op-
+timization (PPO) [30], a stable and efﬁcient reinforcement
+learning algorithm. To improve training stability and policy
+generalization, we employ a curriculum learning approach that
+progressively increases decision frequency during training. Ini-
+tially, actions correspond to full viewpoint traversals (Stage 1),
+simplifying the action space and stabilizing early value estima-
+tion. Subsequently, we incrementally raise decision frequency
+(Stages2–3:0.125Hzto0.5Hz),allowingthepolicytosmoothly
+adapt to ﬁner-grained control. Finally, training transitions to the
+target high-frequency condition (Stage 4: 2 Hz), closely aligning
+with real-world robotic operations. This structured curriculum
+enhances convergence, robustness, and overall exploration ef-
+fectiveness.
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on October 29,2025 at 10:04:51 UTC from IEEE Xplore.  Restrictions apply. 
+LI et al.: LEARNING TO EXPLORE EFFICIENTLY: HETEROGENEOUS TOPOLOGICAL GRAPHS AND LIGHTWEIGHT GLOBAL REASONING
+12361
+Fig. 2.
+Scene illustration. (Left) Side views of the point clouds for the three random scenes—Pillars, Partitions, and Maze; (Right) Topdown views of typical
+exploration trajectories by (a) TARE [4], (b) FAEL [5], (c) DRLE [7], and (d) our proposed method. The color gradient from blue to red indicates the progression
+of each trajectory.
+V. EXPERIMENTAL RESULTS
+A. Implementation Details
+We implement PPO using CleanRL [31] to ensure repro-
+ducibility and conduct training on a server with an AMD EPYC
+7773X 64-Core CPU and two NVIDIA RTX 4090 GPUs. Sim-
+ulations were performed within MARSIM [32], a lightweight
+LiDAR-based simulator. The policy and value networks share
+an encoder over heterogeneous graphs, where each node has
+a 6-dimensional feature embedded into a 64-dimensional latent
+space via a two-layer MLP. To improve generalization and stabi-
+lize training, coordinates are normalized by Min–Max scaling to
+[0,1] and further converted to local frames relative to the robot’s
+position, which mitigates distribution shift and facilitates policy
+transfer.
+B. Simulation Benchmark and Analysis
+We evaluate exploration efﬁciency in three randomized en-
+vironments (Pillars, Partitions, and Maze), shown in Fig. 2.
+These scenarios differ in complexity, measured by the ratio of
+the shortest collision-free path to the straight-line distance.
+Our method is compared with state-of-the-art LiDAR-based
+exploration algorithms: TARE [4], FAEL [5], and DRLE [7].
+TARE employs dual-resolution mapping with dense local maps
+for feasible trajectories and sparse global maps for coverage
+guidance. FAEL uses rapid environment preprocessing and
+heuristic path optimization, supporting high-frequency replan-
+ning in large environments. DRLE utilizes deep reinforce-
+ment learning with attention-based policies, adaptively selecting
+viewpoints for reactive exploration.
+We quantify the performance differences among the evaluated
+methods using three metrics: run time, exploration time, and
+movement distance. In all experiments, the robot is modeled
+TABLE I
+COMPARISON OF DIFFERENT METHODS ON RANDOM SCENES
+as a differential-drive vehicle with a maximum linear velocity
+of 2 m/s, linear acceleration of 2.5 m/s2, and a LiDAR sen-
+sor range of 40 m. In addition, the parameters for modules,
+including viewpoint sampling, topological graph construction,
+and trajectory optimization, were conﬁgured according to the
+ofﬁcially recommended settings of the baseline methods for the
+respective scenarios. The exploration terminates when coverage
+reaches 95%. Each method is executed 10 times from identical
+random starting positions in each scenario.
+Table I summarizes the averaged performance across 10 trials,
+with representative trajectories shown in Fig. 2. We further
+analyze these results with respect to versatility, exploration
+efﬁciency, and responsiveness.
+a) Versatility: All methods complete the exploration tasks
+in each scenario. However, DRLE degrades in Partitions and
+Pillars due to large graph sizes, while our method maintains
+consistent effectiveness and generalizes better across varied,
+unseen environments.
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on October 29,2025 at 10:04:51 UTC from IEEE Xplore.  Restrictions apply. 
+12362
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 12, DECEMBER 2025
+Fig. 3.
+Ablation study of curriculum learning. Performance comparison across
+four decision-frequency stages (Stage 1: full traversal; Stages 2–4: 0.125, 0.5,
+2 Hz). A progressive curriculum leads to faster convergence and improved ﬁnal
+performance.
+b) Exploration Efﬁciency: As shown in Table I, our method
+achieves the best exploration time and path length across all
+scenarios. Compared to the second-best planner, our method
+reduces exploration time and path length by 14.5% and 18.8%
+in Pillars, 13.3% and 11.4% in Partitions, and 0.8% and 7.2%
+in Maze. Our method also yields the lowest variance across sce-
+narios, showing stable performance. Unlike heuristic planners
+(TARE, FAEL), which optimize locally and produce redundant
+crossings, learning-based methods (ours and DRLE) achieve
+more uniform coverage, as illustrated in Fig. 2.
+c) Responsiveness: Runtime comparisons in Table I high-
+light responsiveness differences. FAEL achieves fast updates
+through local planning but sacriﬁces path optimality. DRLE’s
+transformer-based policy becomes less efﬁcient as its topologi-
+cal graph grows. In contrast, the proposed method runs substan-
+tially faster than DRLE and remains comparable to heuristic
+baselines, supporting real-time deployment.
+C. Ablation Study of Curriculum
+To evaluate the effectiveness of the proposed curriculum
+learning strategy, we conduct an ablation study across four
+decision-frequency stages, as shown in Fig. 3. Speciﬁcally,
+Stage 1 executes a full viewpoint traversal per decision (i.e.,
+extremely low frequency). Stages 2–4 introduce intermediate
+and high-frequency decisions at 0.125 Hz, 0.5 Hz, and the target
+frequency of 2 Hz, respectively. Quantitative results indicate
+that progressively increasing decision frequency improves both
+convergence speed and ﬁnal exploration performance. Training
+solely at the lowest frequency (Stage 1) simpliﬁes the critic’s
+task and enables rapid initial convergence, but lacks exposure to
+the ﬁne-grained decision dynamics required at higher frequen-
+cies, limiting generalization. Conversely, training directly at the
+highest frequency (Stage 4) slows learning and causes instability
+in value estimation due to dense temporal feedback. Gradually
+transitioning through intermediate frequencies (Stages 2–3) al-
+lows stable adaptation of the critic, leading to improved policy
+generalization and performance under realistic high-frequency
+conditions.
+Fig. 4.
+Ablation study of global attention. Performance comparison of three
+variants: GCN-only, MHA-only, and Proposed. Our hybrid approach achieves
+the best balance of efﬁciency and exploration effectiveness.
+D. Ablation Study of Global Attention
+To evaluate the role of global attention, we compare three ar-
+chitectural variants, as shown in Fig. 4: (1) the Proposed model,
+which integrates linear global attention and local GCN-based
+message passing; (2) the GCN-only variant, which removes
+global attention; and (3) the Multi-Head Attention (MHA)-only
+variant, which replaces both modules with standard MHA con-
+strained by graph-based masking. Experimental results indicate
+that the proposed hybrid architecture achieves the best balance
+among convergence speed, exploration efﬁciency, and consis-
+tency. The GCN-only variant struggles with large environments
+due to its limited ability to capture global dependencies. Al-
+though the MHA-only variant effectively models global context,
+its computational complexity signiﬁcantly increases memory
+usage and slows training, reducing practicality.
+E. Ablation Study of Heterogeneous Graph
+To evaluate the role of heterogeneous graph abstraction, we
+compare our full model with a homogeneous variant where all
+nodes share the same minimal attribute vector [x, y, ϵ], where
+(x, y) is the spatial coordinate and ϵ quantiﬁes potential explo-
+ration gain. In contrast, the heterogeneous graph assigns type-
+speciﬁc attributes to frontier, border, skeleton, and viewpoint
+nodes, preserving their distinct semantics. As shown in Fig. 6,
+the heterogeneous variant achieves consistently higher rewards
+andshortertraveldistancesafterconvergence,whilemaintaining
+stable training. The homogeneous variant still learns reasonable
+policies, but suffers from less efﬁcient exploration due to the loss
+of structural priors. These results conﬁrm that the heterogeneous
+abstraction is not only semantically interpretable and computa-
+tionally lightweight, but also brings tangible improvements in
+both exploration efﬁciency and policy performance.
+F. Ablation Study of Viewpoint-Based Action Mask
+To evaluate the effect of the viewpoint-based action mask, we
+compare our full model against a baseline where the mask is
+removed and all nodes in the heterogeneous graph are allowed
+as candidate actions. Experimental results are shown in Figs. 7
+and 8. When the mask is removed, the agent initially achieves
+a higher cumulative reward and shorter travel distance since it
+learns to minimize movement cost. However, this behavior is
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on October 29,2025 at 10:04:51 UTC from IEEE Xplore.  Restrictions apply. 
+LI et al.: LEARNING TO EXPLORE EFFICIENTLY: HETEROGENEOUS TOPOLOGICAL GRAPHS AND LIGHTWEIGHT GLOBAL REASONING
+12363
+Fig. 5.
+Overview of real-world experimental setups and exploration results. (a, c) Aerial views of the two test scenarios, with (c) showing the manually deﬁned
+bounding box (red dashed outline). (b, d) Corresponding LiDAR-generated pointcloud maps; the red dashed boxes in (b) indicate zoom-in regions for clarity. (e)
+The wheeled bipedal robot platform equipped with Mid-360 LiDAR and Orin NX computing module.
+Fig. 6.
+Ablation study of heterogeneous graph. Comparison of heterogeneous
+and homogeneous graph representations in terms of reward and travel distance.
+Fig. 7.
+Ablation study of viewpoint-based action mask. With viewpoint mask-
+ing, the policy achieves stable rewards; without masking, training converges to
+a degenerate strategy with high rewards but poor coverage.
+Fig. 8.
+Ablation study of viewpoint-based action mask. The exploration rate
+rapidly declines without masking, indicating that the agent learns to remain idle
+instead of exploring the environment.
+degenerate because the exploration rate steadily decreases and
+eventually approaches zero, meaning that the agent prefers to
+stay idle or oscillate locally rather than covering new areas. As
+a result, the environment is not sufﬁciently explored, and task
+completion cannot be guaranteed. In contrast, the masked for-
+mulation maintains stable reward, reduced travel distance, and
+a consistently positive exploration rate, showing that it balances
+reward optimization with coverage. These results indicate that
+viewpoint-based action masking is not a minor heuristic but a
+key mechanism that prevents collapse into trivial strategies and
+ensures robust exploration performance.
+G. Real-World Experiments
+To validate the effectiveness and robustness of our proposed
+method in realistic scenarios, we conducted extensive ﬁeld ex-
+periments in both indoor (Fig. 5(a)) and outdoor (Fig. 5(c)) envi-
+ronments using the wheeled bipedal robot DIABLO, equipped
+with a Mid-360 LiDAR and an Orin NX onboard computer
+(Fig. 5(e)). Remarkably, the policy trained in simulation was
+directly deployed in these real-world scenarios in a zero-shot
+manner, without any ﬁne-tuning or adaptation. All calcula-
+tions were performed onboard, with dynamics constraints set
+to vmax = 1.0 m/s and amax = 0.8 m/s.
+In the indoor scenario, we explored a large and complex
+ﬂoor that spans three interconnected buildings, covering ap-
+proximately 2412.75 m2. The exploration terminated once no
+frontiers or candidate viewpoints remained in the constructed
+topological graph, which naturally occurred since the environ-
+ment is a closed structure. The robot started from the edge of the
+unexplored area without prior environmental knowledge, and
+the exploration concluded in 629 s, traversing a trajectory of
+514.72 m. Fig. 5(b) shows the ﬁnal generated map and explo-
+ration paths, demonstrating the effectiveness of our method in
+comprehensively covering corridors, rooms, and cluttered areas.
+The outdoor scenario covered a signiﬁcantly larger test area of
+approximately 9846.50 m2, featuring typical campus elements
+such as open areas, walkways, and structured buildings. Since
+the environment is open and unbounded, we deﬁned a bounding
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on October 29,2025 at 10:04:51 UTC from IEEE Xplore.  Restrictions apply. 
+12364
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 12, DECEMBER 2025
+box in the robot’s initial coordinate frame by specifying ﬁxed
+ranges along the x and y axes (highlighted by the red dashed
+outline in Fig. 5(c)) to ensure a well-posed stopping condition.
+The robot continued exploration within this bounded region until
+no new viewpoints were generated, which resulted in completion
+after 629 s and a trajectory of 351.93 m. Fig. 5(d) illustrates
+accurate and comprehensive maps generated by our method,
+validating reliable performance under challenging outdoor con-
+ditions.
+Overall, these real-world experiments highlight the scala-
+bility, efﬁciency, and zero-shot performance of our proposed
+method under realistic and complex environments.
+VI. CONCLUSION
+We proposed a scalable graph-based exploration frame-
+work that integrates heterogeneous topological representations,
+lightweight global-local reasoning, and reinforcement learn-
+ing for large-scale autonomous exploration. The heterogeneous
+graph encodes key spatial semantics in a compact yet expressive
+form, while the combination of linear global attention and local
+graph convolutions enhances inference efﬁciency and scalabil-
+ity. A minimalist reward with curriculum learning mitigates
+sparse-reward challenges and improves policy generalization,
+and viewpoint-based action masking ensures robust and efﬁcient
+decision-making. Extensive simulations and real-world exper-
+iments demonstrate that our method consistently outperforms
+state-of-the-art approaches in efﬁciency, stability, and general-
+ization. Nevertheless, several limitations remain and should be
+addressed in future work. First, the framework has not yet been
+evaluated in highly dynamic environments, where viewpoint es-
+timation may fail; addressing this issue could further enhance the
+framework’s uncertainty-aware capabilities. Furthermore, the
+current graph representation is restricted to 2D grids and ESDF
+skeletons. Extending it to 3D structures with richer features
+will broaden the framework’s applicability. Finally, the existing
+policy selects only the next waypoint, whereas autoregressive
+prediction of waypoint sequences would facilitate a tighter in-
+tegration between global and local planning.
+REFERENCES
+[1] A. Romero, C. Delgado, L. Zanzi, R. Suárez, and X. Costa-Pérez,
+“Cellular-enabled collaborative robots planning and operations for search-
+and-rescue scenarios,” in Proc. IEEE Int. Conf. Robot. Automat., 2024,
+pp. 5942–5948.
+[2] S. Kim et al., “Gas source localization in unknown indoor environments
+using dual-mode information-theoretic search,” IEEE Robot. Automat.
+Lett., vol. 10, no. 1, pp. 588–595, Jan. 2025.
+[3] B. Yamauchi, “Frontier-based exploration using multiple robots,” ACM
+SIGGRAPH, vol. 97, pp. 47–53, 1997.
+[4] C. Cao, H. Zhu, H. Choset, and J. Zhang, “TARE: A hierarchical frame-
+work for efﬁciently exploring complex 3D environments,” in Proc. Robot.:
+Sci. Syst., vol. 5, 2021, p. 2.
+[5] J. Huang et al., “FAEL: Fast autonomous exploration for large-scale
+environments with a mobile robot,” IEEE Robot. Automat. Lett., vol. 8,
+no. 3, pp. 1667–1674, Mar. 2023.
+[6] D. S. Chaplot, D. Gandhi, S. Gupta, A. Gupta, and R. Salakhutdinov,
+“Learning to explore using active neural SLAM,” in Proc. Int. Conf. Learn.
+Representations, 2020, pp. 2193–2210.
+[7] Y.Cao,R.Zhao,Y.Wang,B.Xiang,andG.Sartoretti,“Deepreinforcement
+learning-based large-scale robot exploration,” IEEE Robot. Automat. Lett.,
+vol. 9, no. 5, pp. 4631–4638, May 2024.
+[8] Z. Li, Y. Yang, and H. Cheng, “Efﬁcient multi-agent cooperation: Scalable
+reinforcement learning with heterogeneous graph networks and limited
+communication,” Knowl.-Based Syst., vol. 300, 2024, Art. no. 112124.
+[9] A. Elfes, “Using occupancy grids for mobile robot perception and naviga-
+tion,” IEEE Comput., vol. 22, no. 6, pp. 46–57, Jun. 1989.
+[10] H. Oleynikova, Z. Taylor, M. Fehr, R. Siegwart, and J. Nieto, “Voxblox:
+Incremental 3D euclidean signed distance ﬁelds for on-board MAV
+planning,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst., 2017,
+pp. 1366–1373.
+[11] T. Noël, S. Kabbour, A. Lehuger, E. Marchand, and F. Chaumette, “Disk-
+graph probabilistic roadmap: Biased distance sampling for path planning
+in a partially unknown environment,” in Proc. IEEE/RSJ Int. Conf. Intell.
+Robots Syst., 2022, pp. 5707–5714.
+[12] T. Noël, A. Lehuger, E. Marchand, and F. Chaumette, “Skeleton disk-
+graph roadmap: A sparse deterministic roadmap for safe 2D navigation
+and exploration,” IEEE Robot. Automat. Lett., vol. 9, no. 1, pp. 555–562,
+Jan. 2024.
+[13] B. Zhou, Y. Zhang, X. Chen, and S. Shen, “FUEL: Fast UAV exploration
+using incremental frontier structure and hierarchical planning,” IEEE
+Robot. Automat. Lett., vol. 6, no. 2, pp. 779–786, Apr. 2021.
+[14] T. N. Kipf and M. Welling, “Semi-supervised classiﬁcation with graph
+convolutional networks,” in Proc. Int. Conf. Learn. Representations, 2016,
+pp. 2713–2726.
+[15] P. Veliˇckovi´c, G. Cucurull, A. Casanova, A. Romero, P. Liò, and Y. Bengio,
+“Graph attention networks,” in Proc. Int. Conf. Learn. Representations,
+2018, pp. 2920–2931.
+[16] S. Yun, M. Jeong, R. Kim, J. Kang, and H. J. Kim, “Graph transformer
+networks,”inProc.Adv.NeuralInf.Process.Syst.,2019,pp.11983–11993.
+[17] U. Alon and E. Yahav, “On the bottleneck of graph neural networks and its
+practical implications,” in Proc. Int. Conf. Learn. Representations, 2021,
+pp. 14048–14063.
+[18] A. Katharopoulos, A. Vyas, N. Pappas, and F. Fleuret, “Transformers are
+RNNs: Fast autoregressive transformers with linear attention,” in Proc.
+Int. Conf. Mach. Learn., 2020, pp. 5156–5165.
+[19] Q. Wu et al., “SGFormer: Simplifying and empowering transformers for
+large-graph representations,” in Proc. Adv. Neural Inf. Process. Syst., 2023,
+pp. 64753–64773.
+[20] J. Yu, H. Shen, J. Xu, and T. Zhang, “ECHO: An efﬁcient heuristic view-
+point determination method on frontier-based autonomous exploration for
+quadrotors,” IEEE Robot. Automat. Lett., vol. 8, no. 8, pp. 5047–5054,
+Aug. 2023.
+[21] R. S. Sutton et al., Reinforcement Learning: An Introduction, vol. 1, no. 1.
+Cambridge, MA, USA: MIT Press, 1998.
+[22] A. Ecoffet, J. Huizinga, J. Lehman, K. O. Stanley, and J. Clune,
+“Go-explore: A new approach for hard-exploration problems,” 2019,
+arXiv:1901.10995.
+[23] A. Jonnarth, J. Zhao, and M. Felsberg, “Learning coverage paths in
+unknown environments with deep reinforcement learning,” in Proc. Int.
+Conf. Mach. Learn., 2024, pp. 22491–22508.
+[24] D. Pathak, P. Agrawal, A. A. Efros, and T. Darrell, “Curiosity-driven
+exploration by self-supervised prediction,” in Proc. IEEE Conf. Comput.
+Vis. Pattern Recognit. Workshops, 2017, pp. 16–17.
+[25] J. Lee, J. Hwangbo, L. Wellhausen, V. Koltun, and M. Hutter, “Learning
+quadrupedal locomotion over challenging terrain,” Sci. Robot., vol. 5,
+no. 47, 2020, Art. no. eabc5986.
+[26] L. Weng, “Reward hacking in reinforcement learning,” 2024. [On-
+line]. Available: https://lilianweng.github.io/posts/2024-11-28-reward-
+hacking/
+[27] S. Narvekar, B. Peng, M. Leonetti, J. Sinapov, M. E. Taylor, and P. Stone,
+“Curriculum learning for reinforcement learning domains: A framework
+and survey,” J. Mach. Learn. Res., vol. 21, no. 181, pp. 1–50, 2020.
+[28] O. Devillers, S. Hornus, and C. Jamin, “dD triangulations,” in CGAL User
+and Reference Manual, CGAL Editorial Board, 2024. [Online]. Available:
+https://doc.cgal.org/6.0.1/Manual/packages.html#PkgTriangulations
+[29] A. Vaswani et al., “Attention is all you need,” in Proc. Adv. Neural Inf.
+Process. Syst., 2017, vol. 30, pp. 6000–6010.
+[30] J.Schulman,F.Wolski,P.Dhariwal,A.Radford,andO.Klimov,“Proximal
+policy optimization algorithms,” 2017, arXiv:1707.06347.
+[31] S. Huang et al., “CleanRL: High-quality single-ﬁle implementations of
+deep reinforcement learning algorithms,” J. Mach. Learn. Res., vol. 23,
+no. 274, pp. 1–18, 2022.
+[32] F. Kong et al., “MARSIM: A light-weight point-realistic simulator
+for LiDAR-based UAVs,” IEEE Robot. Automat. Lett., vol. 8, no. 5,
+pp. 2954–2961, May 2023.
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on October 29,2025 at 10:04:51 UTC from IEEE Xplore.  Restrictions apply. 

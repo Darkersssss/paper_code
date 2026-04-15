@@ -1,0 +1,908 @@
+
+========== paper1 (Learning_to_Explore_Efficiently_Heterogeneous_Topological_Graphs_and_Lightweight_Global_Reasoning_for_Robotic_Exploration.txt) ==========
+  2: 12357
+> 3: Learning to Explore Efﬁciently: Heterogeneous
+  4: Topological Graphs and Lightweight Global
+
+  17: In this letter, we propose a scalable exploration framework that
+> 18: integrates heterogeneous topological representations, lightweight
+  19: global-local graph reasoning, and reinforcement learning. Our
+
+  74: efﬁcient and behaviorally robust remains a challenging task.
+> 75: Classical frontier-based methods [3], [4], [5] address this chal-
+  76: lenge by decomposing the task into frontier detection, viewpoint
+
+  75: Classical frontier-based methods [3], [4], [5] address this chal-
+> 76: lenge by decomposing the task into frontier detection, viewpoint
+  77: selection, and path planning, providing an interpretable frame-
+
+  87: environments [8]. Furthermore, existing methods often overlook
+> 88: geometric information embedded in environmental topology,
+  89: leading to inefﬁcient exploration and limited generalization.
+
+  93: In this letter, we propose a scalable graph-based exploration
+> 94: framework that integrates heterogeneous graph representations
+  95: with global-local reasoning and RL. The main contributions are
+
+  96: summarized as follows.
+> 97: r Heterogeneous Graph Abstraction: We design a compact
+  98: yet expressive topological representation of the environ-
+
+  98: yet expressive topological representation of the environ-
+> 99: ment,withdiversenodetypes(frontiers,borders,skeletons,
+  100: viewpoints) that encode distinct spatial and semantic roles.
+
+  101: This abstraction reduces the complexity of large-scale
+> 102: maps while preserving critical cues such as connectivity,
+  103: visibility, and coverage gain.
+
+  104: r Global-Local Graph Inference Module: We develop a hy-
+> 105: brid graph neural network (GNN) that combines linear
+  106: global attention with local graph convolution. This enables
+
+  105: brid graph neural network (GNN) that combines linear
+> 106: global attention with local graph convolution. This enables
+  107: efﬁcient O(N) reasoning while preserving structural bias,
+
+  143: cially those from Hamilton-Jacobi formulations, capture naviga-
+> 144: ble pathways with minimal redundancy. Frontier-based explo-
+  145: ration leverages topological abstractions to simplify viewpoint
+
+  146: selection and planning [4], [5], [13]. However, homogeneous
+> 147: representations cannot distinguish between frontiers, borders,
+  148: and viewpoints, limiting their expressiveness. To address this,
+
+  148: and viewpoints, limiting their expressiveness. To address this,
+> 149: we introduce a heterogeneous representation that explicitly en-
+  150: codes different node types, improving both structural clarity and
+
+  156: Convolutional
+> 157: Networks
+  158: (GCNs) [14], Graph Attention Networks (GATs) [15], and
+
+  157: Networks
+> 158: (GCNs) [14], Graph Attention Networks (GATs) [15], and
+  159: Transformer-based models [16], have shown promise in
+
+  158: (GCNs) [14], Graph Attention Networks (GATs) [15], and
+> 159: Transformer-based models [16], have shown promise in
+  160: navigation
+
+  167: over-smoothing and over-squashing [17]. Recent variants
+> 168: like Linear Transformers and Graph Linear Attention [18],
+  169: [19] reduce complexity to linear order. However, these
+
+  176: address
+> 177: this, we propose a hybrid graph reasoning architecture
+  178: that combines linear-complexity global attention with local
+
+  178: that combines linear-complexity global attention with local
+> 179: graph convolutions, capturing long-range dependencies while
+  180: preserving local structure, improving inference efﬁciency and
+
+  223: model, R(s, a, s′) the reward function, and γ ∈[0, 1) the dis-
+> 224: count factor.
+  225: We represent the environment as a topological graph G =
+
+  229: ﬁciently encodes the environment where nodes v ∈V capture
+> 230: key attributes (e.g., frontier values, traversability metrics) and
+  231: edges e ∈E represent feasible paths. The observation O at
+
+  230: key attributes (e.g., frontier values, traversability metrics) and
+> 231: edges e ∈E represent feasible paths. The observation O at
+  232: each decision step is the current topological graph built from
+
+  232: each decision step is the current topological graph built from
+> 233: the robot’s partial knowledge. The action space A consists of
+  234: selecting the next node to visit, simplifying planning compared
+
+  239: Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on October 29,2025 at 10:04:51 UTC from IEEE Xplore.  Restriction
+> 240: LI et al.: LEARNING TO EXPLORE EFFICIENTLY: HETEROGENEOUS TOPOLOGICAL GRAPHS AND LIGHTWEIGHT GLOBAL REASONING
+  241: 12359
+
+  242: Fig. 1.
+> 243: Overview of the proposed exploration framework. (a) Heterogeneous graph construction: Incremental abstraction from occupancy grid to topological graph
+  244: through boundary deﬁnition, skeleton extraction, and viewpoint insertion, producing semantically distinct node types (frontier, border, skeleton, view
+
+  243: Overview of the proposed exploration framework. (a) Heterogeneous graph construction: Incremental abstraction from occupancy grid to topological graph
+> 244: through boundary deﬁnition, skeleton extraction, and viewpoint insertion, producing semantically distinct node types (frontier, border, skeleton, viewpoint). (b)
+  245: Graph-based inference framework: A lightweight encoder-decoder architecture combining linear global attention and local graph convolution efﬁciently g
+
+  244: through boundary deﬁnition, skeleton extraction, and viewpoint insertion, producing semantically distinct node types (frontier, border, skeleton, view
+> 245: Graph-based inference framework: A lightweight encoder-decoder architecture combining linear global attention and local graph convolution efﬁciently generates
+  246: embeddings, aggregates global context, and selects optimal viewpoints via an attention-guided action mask.
+
+  250: denotes the truncation horizon.
+> 251: B. Heterogeneous Graph-Based Topological Mapping
+  252: To preserve rich environmental information while minimiz-
+
+  254: erogeneous graph G = (V, E, T), where V denotes vertices, E
+> 255: denotes edges (vi, vj) connecting these vertices, and T denotes
+  256: predeﬁned vertex types. Each vertex vi ∈V is associated with
+
+  257: an attribute vector u tailored to its speciﬁc role. Here, we
+> 258: focus explicitly on distinguishing vertex types and ignore edge
+  259: attributes.
+
+  261: map classiﬁed into free, occupied, and unknown cells, we build
+> 262: a heterogeneous graph by extracting key vertices V in three
+  263: steps: deﬁning boundaries, extracting skeleton, and inserting
+
+  264: viewpoints. First, we deﬁne two types of boundary vertices (see
+> 265: Fig. 1): Frontier vertices vf, extracted from free cells adjacent
+  266: to unknown cells, marking exploration frontiers, and Border
+
+  265: Fig. 1): Frontier vertices vf, extracted from free cells adjacent
+> 266: to unknown cells, marking exploration frontiers, and Border
+  267: vertices vb, extracted from free cells adjacent to occupied cells,
+
+  271: identiﬁes essential pathways in free space. Finally, following the
+> 272: classical frontier-based exploration strategy [20], we compute
+  273: Viewpoints vv that strategically observe unexplored regions.
+
+  275: clarity for effective exploration planning.
+> 276: 2) Edge Construction: With V deﬁned, we establish the
+  277: edges E to ensure connectivity. We generate candidate edges
+
+  276: 2) Edge Construction: With V deﬁned, we establish the
+> 277: edges E to ensure connectivity. We generate candidate edges
+  278: by performing a Delaunay triangulation over the entire node
+
+  279: set using the CGAL library [28], providing a well-distributed
+> 280: set of connections. Each edge is then validated by collision
+  281: checking against the occupancy grid, and those intersecting
+
+  286: 3) Vertex Attributes: Each vertex type is assigned a concise
+> 287: attribute vector u tailored for decision-making. Frontier (vf)
+  288: and border (vb) store spatial coordinates u = [x, y], sufﬁcient
+
+  297: A. Framework Overview
+> 298: We propose a scalable encoder–decoder framework for
+  299: robotic exploration (Fig. 1). The encoder combines a linear
+
+  298: We propose a scalable encoder–decoder framework for
+> 299: robotic exploration (Fig. 1). The encoder combines a linear
+  300: global attention mechanism [19] with local graph convolutions
+
+  299: robotic exploration (Fig. 1). The encoder combines a linear
+> 300: global attention mechanism [19] with local graph convolutions
+  301: to capture both long-range and local spatial contexts in O(N)
+
+  301: to capture both long-range and local spatial contexts in O(N)
+> 302: time, while the decoder applies attention-based action selection
+  303: constrained by a viewpoint-based action mask. This design
+
+  305: environments.
+> 306: B. Encoder
+  307: We ﬁrst encode vertex attributes uv into a latent embedding
+
+  343: where fQ, fK, fV are linear transformations, and ∥· ∥F denotes
+> 344: the Frobenius norm. Node embeddings are updated efﬁciently
+  345: using a diagonal normalization matrix D:
+
+  368: graph adjacency matrix A, we fuse the global embeddings hg
+> 369: with local graph convolutional updates. Speciﬁcally, we employ
+  370: a simple yet efﬁcient approach:
+
+  379: ho = [hv]N
+> 380: v=1 serve as inputs to the decoder. This integration
+  381: ensures the model simultaneously captures global structural
+
+  383: quality for exploration tasks.
+> 384: C. Decoder
+  385: The decoder aims to produce a global graph-level embedding
+
+  384: C. Decoder
+> 385: The decoder aims to produce a global graph-level embedding
+  386: from the node-level embeddings ho. To intuitively aggregate
+
+  392: This approach effectively summarizes the global context by
+> 393: weighting node embeddings according to their relevance to
+  394: the robot’s current position, capturing essential structural and
+
+  420: D. Action Selection and Value Estimation
+> 421: Given the graph-level embedding hagg from the decoder, we
+  422: employ a single-head attention mechanism to determine the next
+
+  460: Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on October 29,2025 at 10:04:51 UTC from IEEE Xplore.  Restriction
+> 461: LI et al.: LEARNING TO EXPLORE EFFICIENTLY: HETEROGENEOUS TOPOLOGICAL GRAPHS AND LIGHTWEIGHT GLOBAL REASONING
+  462: 12361
+
+  472: ulations were performed within MARSIM [32], a lightweight
+> 473: LiDAR-based simulator. The policy and value networks share
+  474: an encoder over heterogeneous graphs, where each node has
+
+  473: LiDAR-based simulator. The policy and value networks share
+> 474: an encoder over heterogeneous graphs, where each node has
+  475: a 6-dimensional feature embedded into a 64-dimensional latent
+
+  538: through local planning but sacriﬁces path optimality. DRLE’s
+> 539: transformer-based policy becomes less efﬁcient as its topologi-
+  540: cal graph grows. In contrast, the proposed method runs substan-
+
+  552: convergence speed and ﬁnal exploration performance. Training
+> 553: solely at the lowest frequency (Stage 1) simpliﬁes the critic’s
+  554: task and enables rapid initial convergence, but lacks exposure to
+
+  559: transitioning through intermediate frequencies (Stages 2–3) al-
+> 560: lows stable adaptation of the critic, leading to improved policy
+  561: generalization and performance under realistic high-frequency
+
+  570: which integrates linear global attention and local GCN-based
+> 571: message passing; (2) the GCN-only variant, which removes
+  572: global attention; and (3) the Multi-Head Attention (MHA)-only
+
+  574: strained by graph-based masking. Experimental results indicate
+> 575: that the proposed hybrid architecture achieves the best balance
+  576: among convergence speed, exploration efﬁciency, and consis-
+
+  581: usage and slows training, reducing practicality.
+> 582: E. Ablation Study of Heterogeneous Graph
+  583: To evaluate the role of heterogeneous graph abstraction, we
+
+  582: E. Ablation Study of Heterogeneous Graph
+> 583: To evaluate the role of heterogeneous graph abstraction, we
+  584: compare our full model with a homogeneous variant where all
+
+  586: (x, y) is the spatial coordinate and ϵ quantiﬁes potential explo-
+> 587: ration gain. In contrast, the heterogeneous graph assigns type-
+  588: speciﬁc attributes to frontier, border, skeleton, and viewpoint
+
+  587: ration gain. In contrast, the heterogeneous graph assigns type-
+> 588: speciﬁc attributes to frontier, border, skeleton, and viewpoint
+  589: nodes, preserving their distinct semantics. As shown in Fig. 6,
+
+  589: nodes, preserving their distinct semantics. As shown in Fig. 6,
+> 590: the heterogeneous variant achieves consistently higher rewards
+  591: andshortertraveldistancesafterconvergence,whilemaintaining
+
+  593: policies, but suffers from less efﬁcient exploration due to the loss
+> 594: of structural priors. These results conﬁrm that the heterogeneous
+  595: abstraction is not only semantically interpretable and computa-
+
+  600: compare our full model against a baseline where the mask is
+> 601: removed and all nodes in the heterogeneous graph are allowed
+  602: as candidate actions. Experimental results are shown in Figs. 7
+
+  606: Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on October 29,2025 at 10:04:51 UTC from IEEE Xplore.  Restriction
+> 607: LI et al.: LEARNING TO EXPLORE EFFICIENTLY: HETEROGENEOUS TOPOLOGICAL GRAPHS AND LIGHTWEIGHT GLOBAL REASONING
+  608: 12363
+
+  613: Fig. 6.
+> 614: Ablation study of heterogeneous graph. Comparison of heterogeneous
+  615: and homogeneous graph representations in terms of reward and travel distance.
+
+  648: proximately 2412.75 m2. The exploration terminated once no
+> 649: frontiers or candidate viewpoints remained in the constructed
+  650: topological graph, which naturally occurred since the environ-
+
+  650: topological graph, which naturally occurred since the environ-
+> 651: ment is a closed structure. The robot started from the edge of the
+  652: unexplored area without prior environmental knowledge, and
+
+  651: ment is a closed structure. The robot started from the edge of the
+> 652: unexplored area without prior environmental knowledge, and
+  653: the exploration concluded in 629 s, traversing a trajectory of
+
+  677: We proposed a scalable graph-based exploration frame-
+> 678: work that integrates heterogeneous topological representations,
+  679: lightweight global-local reasoning, and reinforcement learn-
+
+  679: lightweight global-local reasoning, and reinforcement learn-
+> 680: ing for large-scale autonomous exploration. The heterogeneous
+  681: graph encodes key spatial semantics in a compact yet expressive
+
+  682: form, while the combination of linear global attention and local
+> 683: graph convolutions enhances inference efﬁciency and scalabil-
+  684: ity. A minimalist reward with curriculum learning mitigates
+
+  708: Lett., vol. 10, no. 1, pp. 588–595, Jan. 2025.
+> 709: [3] B. Yamauchi, “Frontier-based exploration using multiple robots,” ACM
+  710: SIGGRAPH, vol. 97, pp. 47–53, 1997.
+
+  723: [8] Z. Li, Y. Yang, and H. Cheng, “Efﬁcient multi-agent cooperation: Scalable
+> 724: reinforcement learning with heterogeneous graph networks and limited
+  725: communication,” Knowl.-Based Syst., vol. 300, 2024, Art. no. 112124.
+
+  740: [13] B. Zhou, Y. Zhang, X. Chen, and S. Shen, “FUEL: Fast UAV exploration
+> 741: using incremental frontier structure and hierarchical planning,” IEEE
+  742: Robot. Automat. Lett., vol. 6, no. 2, pp. 779–786, Apr. 2021.
+
+  743: [14] T. N. Kipf and M. Welling, “Semi-supervised classiﬁcation with graph
+> 744: convolutional networks,” in Proc. Int. Conf. Learn. Representations, 2016,
+  745: pp. 2713–2726.
+
+  746: [15] P. Veliˇckovi´c, G. Cucurull, A. Casanova, A. Romero, P. Liò, and Y. Bengio,
+> 747: “Graph attention networks,” in Proc. Int. Conf. Learn. Representations,
+  748: 2018, pp. 2920–2931.
+
+  748: 2018, pp. 2920–2931.
+> 749: [16] S. Yun, M. Jeong, R. Kim, J. Kang, and H. J. Kim, “Graph transformer
+  750: networks,”inProc.Adv.NeuralInf.Process.Syst.,2019,pp.11983–11993.
+
+  749: [16] S. Yun, M. Jeong, R. Kim, J. Kang, and H. J. Kim, “Graph transformer
+> 750: networks,”inProc.Adv.NeuralInf.Process.Syst.,2019,pp.11983–11993.
+  751: [17] U. Alon and E. Yahav, “On the bottleneck of graph neural networks and its
+
+  750: networks,”inProc.Adv.NeuralInf.Process.Syst.,2019,pp.11983–11993.
+> 751: [17] U. Alon and E. Yahav, “On the bottleneck of graph neural networks and its
+  752: practical implications,” in Proc. Int. Conf. Learn. Representations, 2021,
+
+  753: pp. 14048–14063.
+> 754: [18] A. Katharopoulos, A. Vyas, N. Pappas, and F. Fleuret, “Transformers are
+  755: RNNs: Fast autoregressive transformers with linear attention,” in Proc.
+
+  754: [18] A. Katharopoulos, A. Vyas, N. Pappas, and F. Fleuret, “Transformers are
+> 755: RNNs: Fast autoregressive transformers with linear attention,” in Proc.
+  756: Int. Conf. Mach. Learn., 2020, pp. 5156–5165.
+
+  756: Int. Conf. Mach. Learn., 2020, pp. 5156–5165.
+> 757: [19] Q. Wu et al., “SGFormer: Simplifying and empowering transformers for
+  758: large-graph representations,” in Proc. Adv. Neural Inf. Process. Syst., 2023,
+
+  760: [20] J. Yu, H. Shen, J. Xu, and T. Zhang, “ECHO: An efﬁcient heuristic view-
+> 761: point determination method on frontier-based autonomous exploration for
+  762: quadrotors,” IEEE Robot. Automat. Lett., vol. 8, no. 8, pp. 5047–5054,
+
+
+[Total lines matched: 86]
+
+========== paper2 (MARVEL_Multi-Agent_Reinforcement_Learning_for_Constrained_Field-of-View_Multi-Robot_Exploration_in_Large-Scale_Environments.txt) ==========
+  13: movement. In this work, we propose MARVEL, a neural frame-
+> 14: work that leverages graph attention networks, together with
+  15: novel frontiers and orientation features fusion technique, to
+
+  14: work that leverages graph attention networks, together with
+> 15: novel frontiers and orientation features fusion technique, to
+  16: develop a collaborative, decentralized policy using multi-agent
+
+  64: as adapting to dynamic environments that require ongoing
+> 65: coordination to effectively cover new areas. Frontier-based
+  66: approaches are widely used for both single- and multi-
+
+  67: agent robotic exploration [6], [7], utilizing heuristics to guide
+> 68: robots toward frontiers—the boundaries between known and
+  69: unknown areas (see Fig. 1). These methods aim to balance
+
+  69: unknown areas (see Fig. 1). These methods aim to balance
+> 70: utility (observable frontiers) and cost (path length) [8],
+  71: but fall short in optimizing long-term exploration, often
+
+  74: because robots are always oriented towards their goal, which
+> 75: can fragment frontiers into smaller parts, increasing the
+  76: likelihood of revisitation. Despite their adaptability and lack
+
+  76: likelihood of revisitation. Despite their adaptability and lack
+> 77: of training requirements, frontier-based methods frequently
+  78: demand extensive, complex hyperparameter tuning, which
+
+  79: limits their generalization to different environments.
+> 80: An alternative to frontier-based methods is using rein-
+  81: forcement learning (RL), where agents learn an exploration
+
+  81: forcement learning (RL), where agents learn an exploration
+> 82: policy through deep neural networks that process raw sensory
+  83: data. Once trained, these policies enable robots to perform
+
+  96: Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on September 23,2025 at 02:58:34 UTC from IEEE Xplore.  Restricti
+> 97: constraints limit how often frontiers are detected. Without
+  98: reward shaping or intrinsic motivation, robots face ineffi-
+
+  104: FoV must balance exploiting their current viewpoint with
+> 105: exploring unknown regions, while factoring in the long-
+  106: term consequences of their actions on the overall exploration
+
+  109: exploration challenges with constrained FoV. MARVEL uses
+> 110: an attention-based neural network, with intelligent fusion of
+  111: frontiers and orientation features, for enhanced environmen-
+
+  110: an attention-based neural network, with intelligent fusion of
+> 111: frontiers and orientation features, for enhanced environmen-
+  112: tal understanding, as well as ability to handle different spatial
+
+  112: tal understanding, as well as ability to handle different spatial
+> 113: scale. Our approach includes an attentive privileged critic
+  114: network to enhance action estimation and credit assignment.
+
+  113: scale. Our approach includes an attentive privileged critic
+> 114: network to enhance action estimation and credit assignment.
+  115: We also introduce an novel information-driven action pruning
+
+  125: ration has progressed significantly since Yamauchi’s early
+> 126: work on frontier-based methods, which directed robots to-
+  127: ward the nearest unexplored areas by orienting them toward
+
+  127: ward the nearest unexplored areas by orienting them toward
+> 128: the closest frontiers [6]. This approach was later extended to
+  129: multi-robot systems using shared global maps [9]. More ad-
+
+  129: multi-robot systems using shared global maps [9]. More ad-
+> 130: vanced frontier-based techniques now incorporate gain func-
+  131: tions to balance utility and cost when selecting viewpoints
+
+  133: of-view (FoV) sensors, these methods struggle to efficiently
+> 134: evaluate large numbers of frontiers due to limited visibility.
+  135: In response, sampling-based methods have been proposed,
+
+  145: applied to multi-robot exploration by guiding robots toward
+> 146: frontiers based on the occupancy grid and a resistance force
+  147: for each agent [15]. APF tends to make robots face nearby
+
+  147: for each agent [15]. APF tends to make robots face nearby
+> 148: frontiers, which can lead to inefficient local exploration
+  149: in constrained FoV scenarios. Voronoi-based methods [16]
+
+  155: training flexibility and strong expressivity of the environment
+> 156: [17]. Niroui et al.[18] proposed combining frontier-based
+  157: methods with deep reinforcement learning, and adaptively
+
+  157: methods with deep reinforcement learning, and adaptively
+> 158: tuning gain function parameters for frontier selection to
+  159: enhance exploration performance. Studies by
+
+  160: [19], [20]
+> 161: utilized convolutional neural networks (CNNs) in their deep
+  162: reinforcement learning frameworks. There are also studies
+
+  163: that explore incorporating spatial map memory into the
+> 164: network by utilizing a differentiable spatial memory [21],
+  165: [22]. A notable work for single-agent visual exploration is
+
+  168: has also been extended with a multi-agent planning module,
+> 169: leveraging a transformer-based architecture. This approach
+  170: employs hierarchical self-attention mechanisms to capture
+
+  186: with decentralized execution (CTDE) paradigm and intro-
+> 187: duces a multi-agent attentive critic algorithm, inspired by
+  188: [32]. This approach enhances credit assignment by evaluating
+
+  211: Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on September 23,2025 at 02:58:34 UTC from IEEE Xplore.  Restricti
+> 212: Fig. 2: MARVEL’s policy and critic network architecture. We proposed a policy and critic network that leverage on graph-based
+  213: attention. In the graphs, blue circles indicates the nodes that are connected by edges, indicates as tan lines. We also extract the frontiers
+
+  212: Fig. 2: MARVEL’s policy and critic network architecture. We proposed a policy and critic network that leverage on graph-based
+> 213: attention. In the graphs, blue circles indicates the nodes that are connected by edges, indicates as tan lines. We also extract the frontiers
+  214: (red dots) distribution of each nodes to provide more context to our neural networks.
+
+  213: attention. In the graphs, blue circles indicates the nodes that are connected by edges, indicates as tan lines. We also extract the frontiers
+> 214: (red dots) distribution of each nodes to provide more context to our neural networks.
+  215: FoV, similar to [5]. We also assume perfect communication
+
+  251: constrained FoV as a RL problem and present our proposed
+> 252: attention-based policy and critic neural networks, along with
+  253: the specifics of our training approach.
+
+  267: (v0, v1, . . . ), with vt = (xt, yt) ∈Bf, and connect them with
+> 268: collision-free edges Et = {(vi, vi+1) | i = 1, . . . , t −1},
+  269: forming a graph Gt = (Vt, Et). At each timestep, agents
+
+  282: agents Ψt, which together represent environmental structure
+> 283: and agent distribution. We introduce Ft, a set of frontier
+  284: distributions around each node in Vt. This distribution is
+
+  286: each node and recording the normalized value of observable
+> 287: frontiers within each FoV. We derive G′
+  288: t = (V ′
+
+  289: t , Et) from
+> 290: Gt to enrich the neural network’s input. Each node v′
+  291: k ∈V ′
+
+  293: Relative position (∆xik, ∆yik), the node’s position relative
+> 294: to agent k. (2) Utility uk, the number of visible frontiers at
+  295: node vk, defined by observable frontiers within sensor range
+
+  294: to agent k. (2) Utility uk, the number of visible frontiers at
+> 295: node vk, defined by observable frontiers within sensor range
+  296: ds and an unobstructed line of sight. (3) Agent occupancy
+
+  303: binary signal indicating if vk is on the A* path to the nearest
+> 304: frontier. This signal has been demonstrated to significantly
+  305: improve the agent’s navigation ability, particularly when the
+
+  305: improve the agent’s navigation ability, particularly when the
+> 306: nearest frontier is distant [33]. (5) Informative heading hk,
+  307: the orientation which maximizes the observable frontiers
+
+  306: nearest frontier is distant [33]. (5) Informative heading hk,
+> 307: the orientation which maximizes the observable frontiers
+  308: within the agent’s FoV. We normalize these node features
+
+  308: within the agent’s FoV. We normalize these node features
+> 309: before inputting them into the policy network, to improve
+  310: learning dynamics.
+
+  315: node, we identify x best headings a based on the number
+> 316: of observable frontiers, forming joint action pairs (vj, aq) |
+  317: aq ∈a1, a2, . . . , ax. We set x to 3. When no frontiers are
+
+  316: of observable frontiers, forming joint action pairs (vj, aq) |
+> 317: aq ∈a1, a2, . . . , ax. We set x to 3. When no frontiers are
+  318: observable, we use the A* path from guidepost gk to sample
+
+  320: to the nearest A* node otherwise. Once agents reach their
+> 321: viewpoints Ψt, our graph attention networks, parameterized
+  322: by θ, generate stochastic policies πθ(ai,t|oi,t). Agents then
+
+  332: rh + rt + rf. This function incorporates: ro , the reward
+> 333: based on the number of observable frontiers from the new
+  334: viewpoint; rh, the heading reward, calculated as the cosine
+
+  335: of the angle deviation from the A* path towards the nearest
+> 336: frontier, scaled by a factor aa (set to 0.3); rt, a team-shared
+  337: reward for the total number of frontiers observed by the team,
+
+  336: frontier, scaled by a factor aa (set to 0.3); rt, a team-shared
+> 337: reward for the total number of frontiers observed by the team,
+  338: where ro and rt are normalized by the maximum observable
+
+  338: where ro and rt are normalized by the maximum observable
+> 339: frontiers within the field of view; and rf, a reward of +10
+  340: for task completion when the cumulative utility of nodes
+
+  343: ensuring smooth trajectory planning.
+> 344: B. Network Architecture
+  345: Our policy network (Fig. 2) utilizes an encoder-decoder
+
+  344: B. Network Architecture
+> 345: Our policy network (Fig. 2) utilizes an encoder-decoder
+  346: architecture with stacked masked attention. The encoder
+
+  345: Our policy network (Fig. 2) utilizes an encoder-decoder
+> 346: architecture with stacked masked attention. The encoder
+  347: refines node features in G′
+
+  348: t, which, combined with the robot’s
+> 349: current location features, are fed to the decoder to generate
+  350: waypoint-heading policies.
+
+  350: waypoint-heading policies.
+> 351: Encoder: Our encoder leverages a sequence of masked
+  352: self-attention layers to enhance the feature representations of
+
+  358: 1. We apply 1D convolutions to Ft that encodes the
+> 359: frontier distribution for each node individually to get frontier
+  360: features hn
+
+  360: features hn
+> 361: 2. This vector captures the node-specific frontier
+  362: data, and extract local patterns and relationships within the
+
+  362: data, and extract local patterns and relationships within the
+> 363: node’s frontier distribution. The resulting node features hn
+  364: 1
+
+  364: 1
+> 365: and frontier features hn
+  366: 2 are concatenated, then projected
+
+  378: structured approach refines features iteratively via local con-
+> 379: nections, enhancing path-finding. This enables the encoder
+  380: to transform hn into ˜hn, where node representations cap-
+
+  382: attention depth N.
+> 383: Policy decoder: The decoder determines the final policy
+  384: using the enhanced node features ˜hn. From these features,
+
+  391: by incorporating information from neighboring nodes. To
+> 392: improve the decoder’s awareness of the local environment,
+  393: we compute two orientation-specific features for each vj: We
+
+  565: neighboring nodes.
+> 566: Critic decoder: We developed our critic network, based
+  567: on [33], to selectively extract pertinent information for each
+
+  567: on [33], to selectively extract pertinent information for each
+> 568: agent by incorporating other agents’ actions. The critic
+  569: network Qϕ, parameterized by ϕ, utilizes the same encoder
+
+  568: agent by incorporating other agents’ actions. The critic
+> 569: network Qϕ, parameterized by ϕ, utilizes the same encoder
+  570: structure as the policy network πθ but features a distinct
+
+  569: network Qϕ, parameterized by ϕ, utilizes the same encoder
+> 570: structure as the policy network πθ but features a distinct
+  571: decoder. During training, the critic receives full ground-
+
+  570: structure as the policy network πθ but features a distinct
+> 571: decoder. During training, the critic receives full ground-
+  572: truth information, such as the entire map or graph (see
+
+  573: Fig. 2), enhancing training stability through privileged learn-
+> 574: ing. Using the enhanced node features ˜hn from the encoder,
+  575: we retrieve the features of other agents, ˜hn
+
+  583: e , com-
+> 584: puted in the same manner as in the policy decoder. Finally,
+  585: these concatenated features are mapped to state-action values
+
+  585: these concatenated features are mapped to state-action values
+> 586: Qϕ(st, at) using a feed-forward layer. The networks are
+  587: trained using soft actor-critic (SAC) algorithm [34].
+
+  586: Qϕ(st, at) using a feed-forward layer. The networks are
+> 587: trained using soft actor-critic (SAC) algorithm [34].
+  588: Training details: We use a training dataset of 5,663
+
+  592: ds = 10m, and a 120◦FoV. Training parameters include
+> 593: a maximum episode length of 128 steps, a discount factor
+  594: of γ = 1, a batch size of 256, and an episode buffer size of
+
+  596: 0.01·log(k), one update per step, and Adam optimizer (10−5
+> 597: LR). The target critic updates every 256 steps. Complete
+  598: code and model are available at https://github.com/
+
+  608: VEL with the following baselines: Nearest [9], which selects
+> 609: the nearest frontier as the global goal using a merged map
+  610: of all agents; MMPF [15], which computes a potential field
+
+  611: based on the explored map and agent positions, guiding
+> 612: agents to frontiers via steepest descent, with a resistance
+  613: force to prevent redundancy. To decrease the computation
+
+  613: force to prevent redundancy. To decrease the computation
+> 614: complexity, frontiers will be gathered into multiple clusters.
+  615: In each iteration, agents will select the smallest potential
+
+  620: select the next sampling location, adapted for multi-agent
+> 621: systems with greedy headings based on observable frontiers.
+  622: We present the average and variance of trajectory length
+
+  675: than nearest and MMPF, indicating the strong performance of
+> 676: graph-based attention networks in learning spatial relation-
+  677: ship for exploration tasks. However, this method struggles
+
+  677: ship for exploration tasks. However, this method struggles
+> 678: with small scattered frontiers, produced due to subopti-
+  679: mal viewpoint orientations, leading to repeated revisits and
+
+  682: length for task completion. In contrast, MARVEL’s attention-
+> 683: based neural network, with intelligent fusion of frontiers
+  684: and orientation information, enhances large environmental
+
+  716: (FoV) sensors in large-scale environments. Our approach
+> 717: employs a graph attention network, with intelligent fusion
+  718: of frontier and orientation features, to enhance environmen-
+
+  717: employs a graph attention network, with intelligent fusion
+> 718: of frontier and orientation features, to enhance environmen-
+  719: tal understanding and allow agents to produce non-myopic
+
+  729: While MARVEL excels in 2D indoor settings, we ac-
+> 730: knowledge the added complexity of 3D environments with
+  731: intricate obstacles. To address this, we plan to extend
+
+  791: L. Carlone, and J. A. Castellanos, “A survey on active simultaneous
+> 792: localization and mapping: State of the art and new frontiers,” IEEE
+  793: Transactions on Robotics, vol. 39, no. 3, pp. 1686–1705, 2023.
+
+  796: Robotics, vol. 39, no. 3, pp. 1816–1835, 2023.
+> 797: [6] B. Yamauchi, “A frontier-based approach for autonomous exploration,”
+  798: in Proceedings 1997 IEEE International Symposium on Computational
+
+  810: (ICRA), 2016, pp. 1462–1468.
+> 811: [9] B. Yamauchi, “Frontier-based exploration using multiple robots,” in
+  812: Proceedings of the Second International Conference on Autonomous
+
+  860: automatic exploration for navigation in unknown environment,” IEEE
+> 861: transactions on neural networks and learning systems, vol. 31, no. 6,
+  862: pp. 2064–2076, 2019.
+
+  882: M. Jaderberg, M. Lanctot, N. Sonnerat, J. Z. Leibo, K. Tuyls, and
+> 883: T. Graepel, “Value-decomposition networks for cooperative multi-
+  884: agent learning based on team reward,” in Proceedings of the 17th
+
+  906: Available: https://ojs.aaai.org/index.php/AAAI/article/view/6221
+> 907: [31] C. Wakilpoor, P. J. Martin, C. Rebhuhn, and A. Vu, “Heterogeneous
+  908: multi-agent
+
+  919: Sha,
+> 920: “Actor-attention-critic
+  921: for
+
+  929: in 8th Annual Conference on Robot Learning, 2024.
+> 930: [34] P. Christodoulou, “Soft actor-critic for discrete action settings,” 2019.
+  931: [Online]. Available: https://arxiv.org/abs/1910.07207
+
+
+[Total lines matched: 89]
+
+========== paper3 (IR2_Implicit_Rendezvous_for_Robotic_Exploration_Teams_under_Sparse_Intermittent_Connectivity.txt) ==========
+  3: Derek Ming Siang Tan1†, Yixiao Ma1, Jingsong Liang1, Yi Cheng Chng2, Yuhong Cao1, Guillaume Sartoretti1
+> 4: Abstract— Information sharing is critical in time-sensitive
+  5: and realistic multi-robot exploration, especially for smaller
+
+  17: for multi-robot exploration. Leveraging attention-based neural
+> 18: networks trained via reinforcement and curriculum learning,
+  19: IR2 allows robots to effectively reason about the longer-
+
+  81: while leaving connectivity to chance. This may lead to poor
+> 82: decisions due to incomplete environmental knowledge [7] [8].
+  83: The second category, continuous connectivity, requires robots
+
+  111: There are three key contributions to our proposed work. First,
+> 112: we use an attention-based neural network trained by deep
+  113: reinforcement learning (DRL) to help robots learn to sequence
+
+  141: multi-robot exploration using conventional planners. Existing
+> 142: planners can be frontier-based, trajectory optimization-based,
+  143: or potential-based. Kulkarni et al. [15] proposed a 3D rapidly
+
+  149: proposed a decentralized approach that uses artificial potential
+> 150: fields to attract multiple robots to different frontiers, and to
+  151: repulse them away from one another. Although conventional
+
+  161: effectively transfer simulation to real-world experiments. Luo
+> 162: et al. [17] utilized graph convolutional neural networks to
+  163: achieve efficient multi-robot exploration. Cao et al. [18]
+
+  163: achieve efficient multi-robot exploration. Cao et al. [18]
+> 164: relied on attention-based neural networks to achieve long-
+  165: term planning in exploration, albeit for a single robot. In
+
+  183: [11][12] advocated for explicit consensus among robots
+> 184: in deciding where and when to gather during frontier-
+  185: based exploration. While these approaches guarantee frequent
+
+  193: act greedily based on their current world belief. In this
+> 194: paper, we leverage attention-based neural network trained with
+  195: reinforcement and curriculum learning to enhance existing
+
+  229: Fig. 2: Hierarchical Graph Formulation Four-stage process illustrated with snapshots from different episodes: (a) Dense local graph
+> 230: construction around robot’s position. (b) Sparse global graph construction via offshoots toward frontiers. (c) Global graph merger combining
+  231: different robots’ global graphs (different colored nodes). The map-surplus utility paths (si,j) between robots are shown as paths with colors
+
+  231: different robots’ global graphs (different colored nodes). The map-surplus utility paths (si,j) between robots are shown as paths with colors
+> 232: of increasing intensity (black to yellow). (d) Global graph pruning to remove nodes that do not lead to frontiers centers (purple circles).
+  233: S
+
+  245: robots are considered to be connected when PR >= Pthresh.
+> 246: To factor in the effects of obstacles on signal strength, we
+  247: adopt the modified LDPL model formulated by [19], and
+
+  255: state transition function T , observation set O sampled from
+> 256: observation functions Z, initial states ρ, and discount factor
+  257: γ. At each decision step, each robot selects and take an action
+
+  294: i,D}. Thereafter, we
+> 295: generate collision-free edges Et
+  296: i by connecting each vertex
+
+  300: long-term planning and slow planning rates due to the large
+> 301: number of vertices and edges in their collision-free graphs. To
+  302: enhance exploration efficiency, we introduce four key features
+
+  319: (2)
+> 320: Thereafter, we generate collision-free edges Et,D by
+  321: connecting each vertex with its k nearest neighbors that are
+
+  326: i ), which represents
+> 327: the number of observable frontiers which are line of sight
+  328: from their respective positions.
+
+  334: by the robot. Second, we extend the global graph from the
+> 335: robot’s position towards frontier clusters present in the dense
+  336: local graph. Such clusters, also known as frontier centers, are
+
+  335: robot’s position towards frontier clusters present in the dense
+> 336: local graph. Such clusters, also known as frontier centers, are
+  337: defined as clusters of nonzero utility viewpoints separated
+
+  353: Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on September 23,2025 at 02:58:36 UTC from IEEE Xplore.  Restricti
+> 354: Fig. 3: DRL-Based Planner Architecture. In a multi-robot setting, for any robot, our approach first merges and sparsifies the global
+  355: graphs shared by robots within connectivity range. Thereafter, we augment the merged graph with additional information pertinent to
+
+  355: graphs shared by robots within connectivity range. Thereafter, we augment the merged graph with additional information pertinent to
+> 356: exploration and rendezvous. This augmented graph is fed into a similar encoder-decoder attention-based neural network architecture as [18].
+  357: combine their neighboring nodes within a specified radius
+
+  367: branches, while maintaining connectivity between all robots
+> 368: and frontier clusters. To adapt the algorithm for a multi-robot
+  369: setting, we build multiple Dijkstra cost graphs beginning from
+
+  370: each robot’s position, to obtain shortest paths between each
+> 371: robot and all frontier centers. We then reconstruct edges from
+  372: these shortest path nodes to form the pruned graph. Compared
+
+  391: to the original single-robot formulation [18]. The exploration
+> 392: utility ui,j represents the number of observable frontiers
+  393: within the node vi,j’s line of sight. The guidepost gi,j is a
+
+  437: observation ot at every decision step, each robot’s attention-
+> 438: based neural network outputs a stochastic policy, denoted
+  439: as πθ,i(at
+
+  454: formulation [18]. This includes the reward for the number of
+> 455: observable frontiers from the new viewpoint ro = |Fo,ψt+1
+  456: i
+
+  471: ) refers
+> 472: to the increase in the total number of frontier points on
+  473: the combined map assuming no communication constraints
+
+  485: rt(ot, at) = α1 · ro + α2 · rd + α3 · rf + α4 · rs + rc.
+> 486: V. NEURAL NETWORK AND TRAINING
+  487: A. Policy and Critic Networks
+
+  486: V. NEURAL NETWORK AND TRAINING
+> 487: A. Policy and Critic Networks
+  488: 1) Encoder: The encoder transforms the explored map into
+
+  487: A. Policy and Critic Networks
+> 488: 1) Encoder: The encoder transforms the explored map into
+  489: a multi-scale representation through multiple self-attention
+
+  526: (4)
+> 527: 2) Decoder: The decoder outputs a policy for the robot to
+  528: act upon. We first extract the current node features hc based on
+
+  529: the current robot position and its connected neighboring node
+> 530: features hn from the output of the encoder h′
+  531: i. Thereafter, we
+
+  550: each. The Simple maps train robots on basic exploration
+> 551: skills such as moving to frontiers efficiently, while the
+  552: Corridor maps train robots to handle situations with prolonged
+
+  561: easy training set and 4-6 robots for the difficult training set.
+> 562: We train our attention-based neural network using the soft
+  563: actor-critic (SAC) algorithm [27], utilizing an AMD Ryzen
+
+  562: We train our attention-based neural network using the soft
+> 563: actor-critic (SAC) algorithm [27], utilizing an AMD Ryzen
+  564: threadripper 3970x and four NVIDIA A5000 GPUs. The task
+
+  589: we combine their maps using a modified 2D Map-Merge
+> 590: package [29] and update their knowledge of each other’s
+  591: positions and global graphs. We enable information hopping
+
+  605: Pursuit decomposes the map into exploration volumes defined
+> 606: by frontier clusters and allocates them to robots by solving the
+  607: Vehicle Routing Problem. During exploration, robots decide
+
+  623: for each planner, and then report the mean and standard
+> 624: deviation across three runs in Table I. For Preplanned, frontier
+  625: centers are often located in inaccessible regions (e.g. behind
+
+  655: in our maze-like training environments with many dead-ends.
+> 656: However, in open spaces with many frontiers like Forest and
+  657: the central part of Campus, robots may have more difficulty
+
+  676: for standard deviation in Indoor, because IR2 occasionally
+> 677: exhibits oscillatory behaviors in critical maze-like junctions
+  678: where robots think others will likely meet them.
+
+  798: This is because Preplanned performs planning towards
+> 799: frontiers using a map directly, instead of building a graph
+  800: representation like IR2 or Pursuit. However, this comes at
+
+  828: rendezvous strategies learned for Complex maps such as
+> 829: waiting at critical junctions to meet up with other robots.
+  830: Such skills are not as effective in Corridor maps that require
+
+  830: Such skills are not as effective in Corridor maps that require
+> 831: more basic dispersal and frontier-following strategies.
+  832: 2) Signal Strength Communications: We validate the
+
+  960: sparse and intermittent connectivity. IR2 leverages attention-
+> 961: based neural networks and curriculum learning to enable
+  962: robots to effectively balance the longer-term trade-offs be-
+
+  1038: [18] Y. Cao, T. Hou, Y. Wang, et al., “Ariadne: A reinforcement learning
+> 1039: approach using attention-based deep networks for exploration,” in 2023
+  1040: IEEE ICRA, 2023, pp. 10 219–10 225.
+
+  1050: need,” in Neural Information Processing Systems, 2017.
+> 1051: [23] O. Vinyals, M. Fortunato, and N. Jaitly, “Pointer networks,” in Advances
+  1052: in NIPS, C. Cortes, N. Lawrence, D. Lee, et al., Eds., vol. 28.
+
+  1062: Conference on Operating Systems Design and Implementation, 2018.
+> 1063: [27] T. Haarnoja, A. Zhou, K. Hartikainen, et al., “Soft actor-critic
+  1064: algorithms and applications,” 2019.
+
+  1068: [29] Y. Xu, J. Yu, J. Tang, et al., “Explore-bench: Data sets, metrics and
+> 1069: evaluations for frontier-based and deep-reinforcement-learning-based
+  1070: autonomous exploration,” in 2022 ICRA.
+
+
+[Total lines matched: 49]

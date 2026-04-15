@@ -1,0 +1,1071 @@
+IR2: Implicit Rendezvous for Robotic Exploration Teams under
+Sparse Intermittent Connectivity
+Derek Ming Siang Tan1†, Yixiao Ma1, Jingsong Liang1, Yi Cheng Chng2, Yuhong Cao1, Guillaume Sartoretti1
+Abstract— Information sharing is critical in time-sensitive
+and realistic multi-robot exploration, especially for smaller
+robotic teams in large-scale environments where connectivity
+may be sparse and intermittent. Existing methods often over-
+look such communication constraints by assuming unrealistic
+global connectivity. Other works account for communication
+constraints (by maintaining close proximity or line of sight
+during information exchange), but are often inefficient. For
+instance, preplanned rendezvous approaches typically involve
+unnecessary detours resulting from poorly timed rendezvous,
+while pursuit-based approaches often result in short-sighted
+decisions due to their greedy nature. We present IR2, a
+deep reinforcement learning approach to information sharing
+for multi-robot exploration. Leveraging attention-based neural
+networks trained via reinforcement and curriculum learning,
+IR2 allows robots to effectively reason about the longer-
+term trade-offs between disconnecting for solo exploration and
+reconnecting for information sharing. In addition, we propose
+a hierarchical graph formulation to maintain a sparse yet
+informative graph, enabling our approach to scale to large-scale
+environments. We present simulation results in three large-scale
+Gazebo environments, which show that our approach yields
+6.6−34.1% shorter exploration paths and significantly improved
+mapped area consistency among robots when compared to state-
+of-the-art baselines. Our simulation training and testing code is
+available at https://github.com/marmotlab/IR2.
+I. INTRODUCTION
+Multi-robot exploration of unknown environments is a well-
+established research area, with significant improvements in
+exploration planning speed and scalability of robot team sizes
+in recent years. It also has a large and growing number of
+applications such as underwater and planetary exploration [1],
+[2], underground mining [3], and search and rescue [4].
+However, one main challenge of translating multi-robot
+exploration research into real-world applications is accounting
+for realistic inter-robot communication constraints.
+In the real world, information exchange can only occur
+when robots are connected. Such connectivity between robots
+is often limited by signal strength between communication
+devices, which can be modeled as a function of distance and
+the medium in which communication is carried out [5]. Some
+exploration planners assume unrealistic global connectivity,
+where robots remain continuously connected regardless of
+† Corresponding author, to whom correspondence should be addressed.
+1Authors
+are
+with
+the
+Department
+of
+Mechanical
+Engineering,
+College of Design and Engineering, National University of Singapore
+{derektan,yixiaoma,jingsongliang}@u.nus.edu,
+{caoyuhong, mpegas}@nus.edu.sg
+2Author
+is
+with
+Singapore
+Technologies
+Engineering
+Ltd,
+yicheng.chng@stengg.com
+Fig. 1: Search-and-rescue robots collaborate to navigate uncharted
+disaster zones under realistic communication constraints. For exam-
+ple, the yellow robot must balance trade-offs between disconnecting
+from its team (blue robots) to independently explore (green arrows),
+and pursuing other robots to exchange information (red arrows).
+the changing distance between them or the communication
+medium [6]. This assumption does not hold in reality. Mean-
+while, other exploration planners adopt different information-
+sharing strategies to account for communication constraints.
+By doing so, these planners can achieve more effective
+generalization to real-world scenarios.
+Connectivity strategies in multi-robot exploration can be
+divided into three broad categories. The first category, oppor-
+tunistic connectivity, involves robots focusing on exploration
+while leaving connectivity to chance. This may lead to poor
+decisions due to incomplete environmental knowledge [7] [8].
+The second category, continuous connectivity, requires robots
+to maintain continuous connection during exploration, po-
+tentially sacrificing efficiency [9] [10]. The third category,
+recurrent connectivity, permits robots to actively connect and
+disconnect, allowing for more efficient information sharing
+and exploration [11] [12]. Under recurrent connectivity, a
+common approach is for all robots to establish explicit
+consensus on when and where to meet (i.e., a rendezvous
+point) before breaking off to explore the environment inde-
+pendently. While this guarantees frequent information sharing,
+exploration efficiency is sacrificed when robots are forced to
+backtrack along long paths with minimal information gain
+for poorly-timed rendezvous. Another common approach
+are the pursuit-based methods [13], which avoids the use
+of explicit consensus by pursuing other robots to share
+information when the benefits outweigh the cost in terms of
+exploration efficiency. However, such approaches are often
+short-sighted and greedy based on their current world belief
+without considering future implications.
+2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)
+October 14-18, 2024. Abu Dhabi, UAE
+979-8-3503-7770-5/24/$31.00 ©2024 IEEE
+13245
+2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) | 979-8-3503-7770-5/24/$31.00 ©2024 IEEE | DOI: 10.1109/IROS58592.2024.10801761
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on September 23,2025 at 02:58:36 UTC from IEEE Xplore.  Restrictions apply. 
+To this end, we propose a novel information-sharing strat-
+egy that achieves high exploration efficiency by estimating the
+future impact of current exploration and rendezvous decisions.
+There are three key contributions to our proposed work. First,
+we use an attention-based neural network trained by deep
+reinforcement learning (DRL) to help robots learn to sequence
+non-myopic decisions. Second, we implement two-stage
+curriculum learning, where robots are placed in increasingly
+difficult exploration environments with increasing frequency
+and duration of disconnectivity. This drives robots to learn
+complex, dynamic connectivity strategies to attain even higher
+exploration efficiency. Lastly, we utilize a hierarchical graph
+formulation, to enable scaling of our strategy to large-scale
+environments. This involves maintaining both a sparse global
+graph representation of the robots’ map and a dense local
+graph centered on the robot. Combining graphs at different
+spatial scales helps robots strike a balance between long- and
+short-term exploration and rendezvous goals.
+Based on simulations, our method outperforms state-of-the-
+art preplanned and pursuit-based planner baselines by 6.6 −
+34.1% in distance efficiency while significantly improving
+mapped area consistency among robots. This indicates strong
+collaboration to achieve more equal and effective sharing of
+the exploration task. We believe this is because our method
+enables robots to effectively balance the longer-term trade-offs
+between disconnecting for solo exploration and reconnecting
+for information sharing. As the deployment of large-scale
+robotic systems remains prohibitive in terms of financial cost
+and hardware complexities, our paper focuses on relatively
+small but highly effective robotic exploration teams [14].
+II. RELATED WORK
+A. Multi-Robot Exploration
+1) Conventional Planners: There is extensive literature on
+multi-robot exploration using conventional planners. Existing
+planners can be frontier-based, trajectory optimization-based,
+or potential-based. Kulkarni et al. [15] proposed a 3D rapidly
+random graph sampling method to plan paths for both UAVs
+and UGVs through a centralized planner. Cao et al. [13]
+divided the exploration space into sub-volumes and distributed
+them to multiple robots via a centralized planner by treating
+the problem as a vehicle routing problem. Yu et al. [6]
+proposed a decentralized approach that uses artificial potential
+fields to attract multiple robots to different frontiers, and to
+repulse them away from one another. Although conventional
+planners are reliable, they often rely on greedy strategies to
+plan short-term paths due to their inability to reason about
+the future impacts of their current decisions.
+2) Learning-based Planners: In the recent decade, DRL-
+based planners have shown remarkable performance due to
+their ability to estimate and maximize long-terms returns. Yu
+et al. [16] used asynchronous multi-robot proximal policy
+optimization to train robots to efficiently explore unknown
+environments, while using action-time randomization to
+effectively transfer simulation to real-world experiments. Luo
+et al. [17] utilized graph convolutional neural networks to
+achieve efficient multi-robot exploration. Cao et al. [18]
+relied on attention-based neural networks to achieve long-
+term planning in exploration, albeit for a single robot. In
+this paper, we extend our previous work [18] to multi-robot
+exploration while considering communication constraints.
+B. Connectivity Strategies
+1) Opportunistic Connectivity: Some exploration methods
+defined connectivity to occur by chance [7] [8]. As encoun-
+ters are random, such approaches do not offer completion
+guarantees and often have high performance variance.
+2) Continuous Connectivity: Many works, including
+[9] [10], achieved exploration while ensuring robots were
+continuously connected to each other as well as to the base sta-
+tion. While these methods ensure a consistent understanding
+of the environment and allow for centralized planning, they
+sacrifice efficiency as robots are often not well-distributed.
+3) Recurrent
+Connectivity:
+Preplanned
+approaches
+[11][12] advocated for explicit consensus among robots
+in deciding where and when to gather during frontier-
+based exploration. While these approaches guarantee frequent
+information sharing, some exploration efficiency is sacrificed
+when robots are forced to backtrack along paths with minimal
+information gain resulting from poorly timed rendezvous.
+On the other hand, pursuit-based approaches [13] pursue
+other robots to share information when the estimated benefits
+outweigh the cost in terms of exploration efficiency. However,
+these approaches often remain short-sighted, and tend to
+act greedily based on their current world belief. In this
+paper, we leverage attention-based neural network trained with
+reinforcement and curriculum learning to enhance existing
+information-sharing strategies with the ability to estimate the
+future impact of current actions.
+III. PROBLEM FORMULATION
+We extend the single-robot exploration problem formu-
+lation in [18] into a multi-robot exploration problem with
+connectivity constraints. We consider a bounded and unknown
+environment represented by a 2D occupancy grid map denoted
+by M. We have n robots {1, 2, ..., n}, and each robot
+maintains its own belief over the exploration map Mi. Each
+map belief consists of unknown region Mu and known region
+Mk, where Mu∪Mk = M. Mk can be further divided into
+free area Mf and occupied Mo, such that Mf ∪Mo = Mk.
+Each robot is equipped with a 360° lidar, with sensor range
+ds. At the beginning of each exploration mission, we assume
+that the relative positions of all robots are known.
+We define the trajectory of viewpoints for each robot ψi =
+(ψi,1, ψi,2, . . . , ψi,m), ψi,j ∈Mi. This setup presents an
+optimization problem where we seek an optimal trajectory
+set Ψ∗given all possible trajectory sets Ψ, which minimizes
+the maximum of all robot’s trajectory length L(ψi). The goal
+Mg is for all robots to achieve 99% exploration of the ground
+truth free space in their individual map belief.
+Ψ∗= argmin
+ψ∈Ψ
+max
+i∈[1,n](L(ψi)),
+s.t. ∀Mi = Mg
+(1)
+Robots exchange map, graph, and position information
+whenever they are within communication range. Their indi-
+vidual exploration map beliefs are merged to form Mk =
+13246
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on September 23,2025 at 02:58:36 UTC from IEEE Xplore.  Restrictions apply. 
+Fig. 2: Hierarchical Graph Formulation Four-stage process illustrated with snapshots from different episodes: (a) Dense local graph
+construction around robot’s position. (b) Sparse global graph construction via offshoots toward frontiers. (c) Global graph merger combining
+different robots’ global graphs (different colored nodes). The map-surplus utility paths (si,j) between robots are shown as paths with colors
+of increasing intensity (black to yellow). (d) Global graph pruning to remove nodes that do not lead to frontiers centers (purple circles).
+S
+i∈[k] Mk,i. Proximity and signal strength are frequently
+used in the research community to define connectivity. For
+proximity-based communication, robots are considered to be
+connected when they are within a specified communication
+distance. Alternatively, communication range based on signal
+strength can be defined using the log distance path loss
+(LDPL) model [5]. The LDPL model predicts the signal
+strength attenuation that a signal encounters when propagated
+through different types of environments. Such an attenuation
+is also known as path loss, PL = PT −PR, where PT and PR
+are the transmitted and received power respectively. Any two
+robots are considered to be connected when PR >= Pthresh.
+To factor in the effects of obstacles on signal strength, we
+adopt the modified LDPL model formulated by [19], and
+chose parameters that closely matches the realistic model [5].
+IV. EXPLORATION AS AN RL PROBLEM
+We formulate the multi-robot exploration problem un-
+der communication constraints as a decentralized partially
+observable Markov Decision Process (Dec-POMDP) [20],
+represented by the tuple (N, S, A, R, T , O, Z, ρ, γ) with N
+robots, state space S, action space A, reward function R,
+state transition function T , observation set O sampled from
+observation functions Z, initial states ρ, and discount factor
+γ. At each decision step, each robot selects and take an action
+based on its policy π(at
+i|ot
+i). Each robot i aims to maximize its
+own total expected return Ri = Eat∼π(·|ot)
+hPT
+t=1 γt−1rt
+i
+i
+.
+A. Hierarchical Graph Formulation
+To avoid overwhelming each robot with dense grid-
+based map data, we extract from their map belief Mi
+a hierarchical collision-free graph Gt
+i = (V t
+i , Et
+i), where
+Vi = (vi,1, vi,2, . . . , vi,m),
+∀vi,j = (xi,j, yi,j) ∈Mf
+represent candidate viewpoints that are distributed across
+the free space of the map. Inspired by [13], we maintain a
+global sparse graph representation Gt
+i,S = (V t
+i,S, Et
+i,S) of the
+map and a local dense graph Gt
+i,D = (V t
+i,D, Et
+i,D) around the
+robot. We observe that having two graphs at different spatial
+scales will help robots balance between long- and short-term
+exploration and rendezvous goals. Unlike previous work that
+performed path planning on the graphs separately [13] [15],
+we combine both graph representations into a single graph
+for path planning, where V t
+i = {V t
+i,S ∪V t
+i,D}. Thereafter, we
+generate collision-free edges Et
+i by connecting each vertex
+vt
+i,j with its k nearest neighbors that are within line of sight.
+In large-scale environments, robots may experience poor
+long-term planning and slow planning rates due to the large
+number of vertices and edges in their collision-free graphs. To
+enhance exploration efficiency, we introduce four key features
+to generate a dense local graph and to retain a sparse global
+graph throughout the exploration process.
+1) Local Graph Construction: At every graph update
+step, a set of local graph vertices surrounding the robot is
+extracted from vertices V t
+i , where vi,R is the robot’s position,
+and dr = 2ds is the length of the box centered on vi,R.
+V t
+i,D =
+
+v ∈V t
+i
+ |vi,x −vi,R,x| ≤dr & |vi,y −vi,R,y| ≤dr
+	
+(2)
+Thereafter, we generate collision-free edges Et,D by
+connecting each vertex with its k nearest neighbors that are
+within line of sight. For each of these vertex, we calculate their
+exploration utility ui = (u1
+i , u2
+i , . . . , um
+i ), which represents
+the number of observable frontiers which are line of sight
+from their respective positions.
+2) Global Graph Construction: Inspired by the concept
+of rapidly random graphs [15], our global graph construction
+process (Fig. 2b) is ego-centric and comprises two parts. First,
+at every graph update step, we add the robot’s position directly
+to its own global graph as it is guaranteed to be traversable
+by the robot. Second, we extend the global graph from the
+robot’s position towards frontier clusters present in the dense
+local graph. Such clusters, also known as frontier centers, are
+defined as clusters of nonzero utility viewpoints separated
+by a threshold radius rg. We use A∗for graph extension,
+where the nodes along these paths are directly added to the
+global graph. Note that our approach is nonrandom, unlike
+the sampling method in rapidly random graphs.
+3) Global Graph Merger: The graph merger algorithm
+(Fig. 2c) is responsible for combining new global graph nodes
+from other robots, and for sparsifying the combined graph to
+maintain a minimal set of nodes for computational tractability.
+Whenever robots are connected, they share their global graphs
+with each other. We first perform Euclidean down-sampling
+of the incoming global graph nodes, and connect these new
+nodes to the current global graph using the same k nearest-
+neighbor approach in the global graph construction step. We
+then iterate through each global graph node to attempt to
+13247
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on September 23,2025 at 02:58:36 UTC from IEEE Xplore.  Restrictions apply. 
+Fig. 3: DRL-Based Planner Architecture. In a multi-robot setting, for any robot, our approach first merges and sparsifies the global
+graphs shared by robots within connectivity range. Thereafter, we augment the merged graph with additional information pertinent to
+exploration and rendezvous. This augmented graph is fed into a similar encoder-decoder attention-based neural network architecture as [18].
+combine their neighboring nodes within a specified radius
+rm. Here, we remove neighboring nodes if the entire graph
+remains connected when they are removed. Note that this
+approach relies on global graphs already constructed by other
+robots during their exploration, hence saving computation
+from not having to reconstruct graphs representing the new
+map portions recently merged in. We run this algorithm at
+every graph update step as it is computationally light.
+4) Global Graph Pruning: The global graph pruning
+algorithm (Fig. 2d), inspired by [21], removes irrelevant
+branches, while maintaining connectivity between all robots
+and frontier clusters. To adapt the algorithm for a multi-robot
+setting, we build multiple Dijkstra cost graphs beginning from
+each robot’s position, to obtain shortest paths between each
+robot and all frontier centers. We then reconstruct edges from
+these shortest path nodes to form the pruned graph. Compared
+to [21], our approach is more computationally efficient in a
+multi-robot setting, since the number of path planning runs
+scales linearly with the number of robots. This algorithm is
+invoked every Np iterations.
+B. Observation Space
+The observation for each robot i is ot = G
+′t
+i , where G
+′t
+i =
+(V
+′t
+i , E
+′t
+i ) is the augmented graph modified from Gt. Each
+augmented vertex v′
+i,j = (vi,j, ui,j, gi,j, pi,j, si,j) comprises
+five components, of which the first three components belong
+to the original single-robot formulation [18]. The exploration
+utility ui,j represents the number of observable frontiers
+within the node vi,j’s line of sight. The guidepost gi,j is a
+binary value indicating if a node has been visited by robot i.
+We further augment each node with two additional features
+to allow robots to better cooperate in the exploration task,
+and to decide whether to pursue other robots for information
+sharing. First, the position indicator pi,j denotes whether
+a node is occupied by the current robot, by another robot,
+or unoccupied, with values -1, +1, and 0 respectively. This
+indicates the relative location of other robots with respect to
+the current robot, allowing for better cooperative decisions to
+be made. Note that pi,j is updated only when robots i and
+other robots are within communication range.
+Second, the map-surplus utility si,j indicates how much
+additional map information a robot believes it possesses
+relative to other robots. This is represented by A∗paths
+along the hierarchical graph that connects the current robot i
+to other robots. The map-surplus utility values corresponding
+to each of these path nodes increases linearly as the distance
+to the other robots gets smaller.
+si,j =
+
+
+
+di,j ∆Mi,k −smin
+di,k
++ smin
+if ∆Mi,k ≥∆Mmin
+0,
+otherwise
+(3)
+where di,j represents the distance between node vi,j and
+robot i’s position along the A∗path, ∆Mi,k = Mi,i −Mi,k
+the map area difference perceived by robot i relative to robot
+k ∈{1, 2, ..., n}, ∆Mmin the minimum map area difference to
+consider a non-zero si,j, and smin a minimum constant value.
+Intuitively, the map-surplus utility guides robots towards other
+robots via a path of increasing utility corresponding to the
+perceived map surplus. In cases where there are multiple
+overlapping A∗paths leading to different robots, the map-
+surplus utility of the overlapping node is determined by the
+highest utility value among all paths at that location.
+C. Action Space
+The action space consists of the k nearest neighboring
+graph vertices that are in the robot’s line of sight. Given
+observation ot at every decision step, each robot’s attention-
+based neural network outputs a stochastic policy, denoted
+as πθ,i(at
+i|ot
+i) = πθ,i(ψt+1
+i,j
+= vi,j, (ψt
+i,j, vi,j) ∈Et
+i | ot
+i).
+We sample each robot’s action following a multinomial
+distribution during training, and greedily during inference.
+D. Reward Structure
+Our main objective is for robots to make long-term deci-
+sions that balance trade-offs between individual exploration
+and pursuing other robots for information sharing. We retain
+the three reward components introduced in the single-robot
+formulation [18]. This includes the reward for the number of
+observable frontiers from the new viewpoint ro = |Fo,ψt+1
+i
+|,
+the distance penalty between the current and new viewpoint
+rd = −C(ψt
+i, ψt+1
+i
+), and exploration completion reward rc.
+13248
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on September 23,2025 at 02:58:36 UTC from IEEE Xplore.  Restrictions apply. 
+Fig. 4: Corridor, Hybrid, and Complex maps (left to right).
+To achieve better coordination and timely information
+sharing among multiple robots, we introduce two additional
+reward components. The first rf = ∆(Fψt
+i, Fψt+1
+i
+) refers
+to the increase in the total number of frontier points on
+the combined map assuming no communication constraints
+Mt = (M1 ∪M2 . . . Mn). Note that the robots do not
+directly observe this combined map. Instead, it is only used
+as privileged information during training to avoid providing
+incentives for redundant exploration that does not contribute to
+the team’s overall exploration task. The second rs = |si,ψt+1
+i
+|
+refers to the incentive of being on a position along the path
+of map-surplus utility that robots can observe. This provides
+dense rewards that encourage robots to pursue other robots
+for information sharing. The total reward is computed as
+rt(ot, at) = α1 · ro + α2 · rd + α3 · rf + α4 · rs + rc.
+V. NEURAL NETWORK AND TRAINING
+A. Policy and Critic Networks
+1) Encoder: The encoder transforms the explored map into
+a multi-scale representation through multiple self-attention
+layers [22]. First, we embed augmented graph vertices V ′
+i into
+d-dimension feature vector hn
+i . As seen in Eq. (4), we obtain
+the query, key, and value vectors qi, ki, and vi by multiplying
+their feature vectors hq
+i = hk
+i = hv
+i = hn
+i with their learnable
+weight matrices W Q, W K, and W V respectively. We then
+compute the similarity matrix uij and the attention weights
+wij to obtain the enhanced node feature h′
+i. Note that each
+attention layer takes the output of the previous one as input.
+qi = W Qhq
+i ,
+ki = W Khk
+i ,
+vi = W V hv
+i
+uij = qT
+i · kj
+√
+d
+,
+wij =
+euij
+Pn
+j=1 euij ,
+h′
+i =
+n
+X
+j=1
+wijvj
+(4)
+2) Decoder: The decoder outputs a policy for the robot to
+act upon. We first extract the current node features hc based on
+the current robot position and its connected neighboring node
+features hn from the output of the encoder h′
+i. Thereafter, we
+pass these features into a cross-attention layer, where hq = hc,
+hk = hn, and hv = hn. Similar to Eq. (4), we eventually
+obtain the output feature vector. It is then concatenated with
+hc and projected back into a d-dimension enhanced current
+node feature vector ˆhc. Finally, we pass both ˆhc and hn into
+a pointer layer [23] to output the robot policy.
+B. Training
+1) Curriculum Learning: We develop a curriculum [24] to
+allow robots to learn complex information-sharing strategies
+incrementally. Our training data contains four types of maps,
+namely Simple, Corridor (160m × 120m), Hybrid (125m ×
+125m), and Complex maps (250m×250m). We obtain Simple
+maps from an open-source data set [25], and custom-generated
+datasets for the remaining maps (Fig. 6).
+Given these maps, we develop a curriculum to train robots
+in two stages - the first with an easy training set, and the
+second with a difficult training set. The easy training set
+contains 10000 maps, with 5000 Simple and Corridor maps
+each. The Simple maps train robots on basic exploration
+skills such as moving to frontiers efficiently, while the
+Corridor maps train robots to handle situations with prolonged
+disconnectivity. The difficult training set contains 6000 maps,
+with 2000 Corridor, Hybrid, and Complex maps each. We
+introduce Hybrid maps that pose challenges found in simple
+and corridor maps, to test robots on both sets of skills within
+the same environment. In addition, we introduce Complex
+maps as a significantly tougher version of Hybrid maps.
+2) Training Details: We employ Ray [26] to perform 32
+concurrent training simulations, each with 3-5 robots for the
+easy training set and 4-6 robots for the difficult training set.
+We train our attention-based neural network using the soft
+actor-critic (SAC) algorithm [27], utilizing an AMD Ryzen
+threadripper 3970x and four NVIDIA A5000 GPUs. The task
+is considered successful only when all robots achieve 99%
+exploration in their respective belief map. Each training run
+on the first training set takes approximately 6000 episodes
+and 18 hours to complete, while each training run on the
+second training set takes approximately 7500 episodes and
+60 hours to complete.
+VI. EXPERIMENTS
+A. Experimental Setup
+We utilize an open-source multi-robot exploration bench-
+mark [13] to validate the performance and generalizability of
+our trained model. We test our approach in three large-scale
+Gazebo simulation environments - Indoor (130m × 100m),
+Forest (150m × 150m), and Campus (340m × 340m). We
+blocked off access to overlapping pathways in the Campus
+environment to ensure compatibility with our 2D planner.
+In addition, these simulation environments offers realistic
+robot kinematic and sensor models compared to our simplified
+training setup. Each ground vehicle has a preset maximum
+speed of 2 m/s and is equipped with a Velodyne Puck lidar
+for exploration and mapping. We utilize Octomap [28] to
+generate 2D occupancy grid maps from 3D lidar scans, with
+a mapping range of 20m. We perform experiments for both
+proximity- and signal strength-based communication models
+(defined in Sec. III). Whenever two robots can communicate,
+we combine their maps using a modified 2D Map-Merge
+package [29] and update their knowledge of each other’s
+positions and global graphs. We enable information hopping
+through intermediate robots to make information sharing more
+realistic. Similar to training, we terminate each run after all
+robots have explored 99% of the ground truth map. All
+experiments are conducted using the same training resources
+to ensure repeatability (Sec. V-B.2).
+13249
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on September 23,2025 at 02:58:36 UTC from IEEE Xplore.  Restrictions apply. 
+Fig. 5: Path visualization of competing approaches for three robots in Indoor [13], where there is no opportunistic connectivity across
+walls. We observe IR2 exhibits the least trajectory overlap and backtracking, followed by Pursuit [13], and finally Preplanned [11].
+Fig. 6: Indoor, Forest, and Campus Gazebo maps (left to right) [13].
+B. Comparison and Analysis
+We compare IR2 with a pursuit-based approach [13]
+(Pursuit) and a preplanned-based approach [11] (Preplanned).
+Pursuit decomposes the map into exploration volumes defined
+by frontier clusters and allocates them to robots by solving the
+Vehicle Routing Problem. During exploration, robots decide
+whether and whom to pursue by weighing the distance cost of
+deviating from its intended route to obtain map information
+from others, versus staying on-route to explore the area.
+On the other hand, Preplanned involves robots agreeing on
+and adhering to a specified exploration time budget and
+rendezvous location. For Preplanned, the time budget is pre-
+set and constant, while the rendezvous position is determined
+dynamically at a location that minimizes the weighted travel
+distance for all robots. Note that the original paper [11]
+includes other robot states intended for task completion,
+which we leave out for fair comparison. We introduce a 10s
+gap between launching each robot to encourage distribution,
+except for Preplanned which is set at 1s since it requires all
+robots to remain in communication range at the beginning.
+We calibrate data collection to account for failures observed
+for each planner, and then report the mean and standard
+deviation across three runs in Table I. For Preplanned, frontier
+centers are often located in inaccessible regions (e.g. behind
+fencelines in Campus). As such, we do not run Preplanned
+in Campus. For Pursuit, we notice robots often terminate
+exploration before achieving 99% exploration. To account for
+this, we only select data from runs where Pursuit achieves
+99% exploration. For IR2, we notice robots occasionally
+display faulty distribution at the beginning of exploration,
+unseen in our simplified training/testing environments. Where
+relevant, we include one set of such data in every set of three
+IR2 runs for fairness. We believe this problem exists because
+robots are trained with holonomic constraints, whereas robots
+in this simulation possess non-holonomic constraints. We
+seek to improve on this sim-to-real gap in future works.
+We evaluate all methods across the three environments
+and report the time efficiency, distance efficiency, map area
+standard deviation, and computation time. Time and distance
+efficiency are the total volume of map explored per unit time
+and distance respectively, averaged across all robots. Map
+area standard deviation measures how equally distributed the
+exploration task is among the robots. Computation time is the
+time taken for robots to perform both map post-processing
+and path planning, averaged across all robots.
+1) Exploration Efficiency: In general, we observe an
+upward trend in both distance and time efficiency when
+increasing the number of robots. For distance efficiency, we
+notice that IR2 outperforms Preplanned and Pursuit in all
+environments, by at least 27.0% and 6.6% respectively, except
+for the 2-robot Forest and Campus tests. We believe that these
+exceptions are due to the tendency of our trained robots to
+disperse early and rendezvous much later, which works well
+in our maze-like training environments with many dead-ends.
+However, in open spaces with many frontiers like Forest and
+the central part of Campus, robots may have more difficulty
+finding each other during rendezvous as their belief of other
+robots’ locations are likely to be very outdated after prolonged
+dispersion. Nevertheless, we notice this problem ceases when
+there are more robots, since each robot has less area to explore
+and thus tends to rendezvous earlier.
+In addition, we observe that performance in distance
+efficiency may not always translate fully to time efficiency.
+This applies to some cases where IR2 is outperformed by
+Pursuit in time efficiency but not distance efficiency, such as
+in the Campus environment. For Preplanned, time efficiency
+is significantly degraded because of the use of the MATLAB-
+ROS toolbox to interface between Preplanned (in MATLAB)
+and our simulator which introduces computational overhead.
+2) Collaboration Metrics: We observe that IR2 achieves
+the lowest map standard deviation for all experiments in Forest
+and Campus. Coupled with IR2’s high distance efficiency,
+this indicates IR2’s ability to equally and effectively share the
+exploration task among robots. However, IR2 performs poorly
+for standard deviation in Indoor, because IR2 occasionally
+exhibits oscillatory behaviors in critical maze-like junctions
+where robots think others will likely meet them.
+13250
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on September 23,2025 at 02:58:36 UTC from IEEE Xplore.  Restrictions apply. 
+TABLE I: Experimental results (30m proximity connectivity). The notation ’↑’ implies that a larger value is preferable, and vice versa.
+Values in parentheses next to each data point denote the corresponding standard deviation.
+Model
+Time Efficiency, ηT (m3/s) ↑
+Distance Efficiency, ηD (m3/m) ↑
+Map Area Stdev, σ (%) ↓
+Computing Time (s) - Planning / Total Time ↓
+130m × 100m Indoor environment with 2, 3, 4 robots
+Preplanned [11]
+5.8 (0.7)
+8.1 (0.3)
+8.1 (0.6)
+4.5 (0.4)
+5.8 (0.1)
+5.9 (0.2)
+4.2 (2.2)
+4.6 (0.9)
+4.3 (0.8)
+0.14 / 0.14 (0.09)
+0.12 / 0.12 (0.04)
+0.16 / 0.16 (0.06)
+Pursuit [13]
+11.6 (1.2)
+13.3 (5.2)
+13.5 (2.8)
+6.6 (0.6)
+8.1 (2.9)
+8.5 (1.7)
+2.2 (2.1)
+8.1 (4.1)
+5.5 (4.8)
+0.19 / 0.42 (0.03)
+0.20 / 0.42 (0.01)
+0.25 / 0.49 (0.05)
+IR2 (Ours)
+12.6 (1.7)
+13.2 (1.7)
+16.4 (2.4)
+8.4 (1.2)
+8.8 (1.2)
+11.4 (2.1)
+4.7 (3.6)
+6.8 (5.0)
+7.1 (2.0)
+0.10 / 0.28 (0.08)
+0.17 / 0.48 (0.20)
+0.21 / 0.61 (0.08)
+150m × 150m Forest environment with 2, 4, 6 robots
+Preplanned [11]
+37.7 (10.2)
+62.4 (12.8)
+80.4 (4.8)
+28.8 (8.1)
+50.7 (9.5)
+62.5 (1.1)
+4.6 (3.1)
+5.1 (2.2)
+7.9 (0.5)
+0.07 / 0.07 (0.01)
+0.12 / 0.12 (0.00)
+0.23 / 0.23 (0.02)
+Pursuit [13]
+88.1 (9.5)
+103.0 (15.1)
+110.3 (47.6)
+46.7 (4.6)
+58.2 (6.0)
+70.9 (17.6)
+2.3 (3.0)
+8.6 (2.6)
+7.5 (2.2)
+0.22 / 0.58 (0.06)
+0.28 / 0.63 (0.11)
+0.31 / 0.64 (0.31)
+IR2 (Ours)
+78.0 (20.1)
+131.1 (45.6)
+132.6 (38.2)
+44.4 (11.4)
+77.1 (27.6)
+79.4 (23.6)
+2.2 (1.7)
+4.1 (1.5)
+4.0 (1.2)
+0.23 / 0.55 (0.15)
+0.21 / 0.59 (0.20)
+0.16 / 0.59 (0.10)
+340m × 340m Campus environment with 2, 4, 6 robots
+Pursuit [13]
+57.7 (15.3)
+59.7 (9.9)
+63.5 (7.7)
+31.0 (6.1)
+31.6 (4.9)
+35.0 (4.2)
+5.1 (6.3)
+11.9 (12.0)
+6.1 (3.3)
+0.18 / 0.50 (0.02)
+0.25 / 0.64 (0.03)
+0.30 / 0.73 (0.10)
+IR2 (Ours)
+46.7 (6.8)
+57.3 (10.9)
+58.4 (8.6)
+26.8 (3.8)
+35.2 (6.3)
+37.3 (3.1)
+3.0 (2.5)
+3.5 (0.8)
+6.1 (2.9)
+0.17 / 0.53 (0.10)
+0.33 / 1.17 (0.12)
+0.30 / 1.53 (0.32)
+3) Computation Time:
+We observe that Preplanned
+achieves the best computation time across all environments.
+This is because Preplanned performs planning towards
+frontiers using a map directly, instead of building a graph
+representation like IR2 or Pursuit. However, this comes at
+the cost of exploration efficiency. We also notice Pursuit
+generally outperforms IR2 in computation time, although
+IR2 maintains comparable planning speed. This is likely due
+to our hierarchical graph formulation that maintains a sparse
+global graph representation of the map for efficient planning.
+Moreover, it is difficult to fairly compare Pursuit in C++
+with IR2 in Python (often 1-2 orders of magnitude slower).
+C. Additional Studies
+1) Ablation Studies: We validate the importance of our
+map-surplus utility observation (si,j) and reward (rs) using
+an ablation study on our curriculum learning framework.
+We train a separate model without these components. We
+validate both trained models on three test sets, each containing
+100 Corridor, Hybrid, and Complex maps never seen during
+training. We evaluate its performance using success rate
+S(%), simulation steps taken, and distance traveled D(m). To
+evaluate success, robots need to explore 99% of the training
+maps within 196 steps for Corridor and Hybrid maps (4
+robots), and 384 steps for Complex maps (5 robots).
+Table II shows that the model trained with map-surplus
+utility observation and rewards outperforms the ablated
+model in all environments and curriculum stages. In addition,
+curriculum learning improves the success rate in Complex
+maps by 52.0%, number of steps by 41.1%, and distance
+traveled by 20.8%. However, we notice degradation in model
+performance particularly for Corridor maps after completing
+stage 2 of the curriculum. This is likely due to the advanced
+rendezvous strategies learned for Complex maps such as
+waiting at critical junctions to meet up with other robots.
+Such skills are not as effective in Corridor maps that require
+more basic dispersal and frontier-following strategies.
+2) Signal Strength Communications: We validate the
+versatility of IR2 on signal strength as the communication
+modality, by performing the same experimental setup as
+for the proximity model (Table III). When compared to
+the proximity model, the signal strength model performs
+worse in terms of time and distance efficiency in the Indoor
+environment by at most 29.4% and 29.8% respectively. This
+can be attributed to the absence of information exchange
+TABLE II: Training performance and ablation test.
+Stage
+Criteria
+Corridor
+Hybrid
+Complex
+Without Map-Surplus Utility (si,j, rs)
+S(%)
+90.0
+100.0
+27.0
+1
+Steps
+95.5
+49.7
+344.8
+D(m)
+1307 (±418)
+689 (±175)
+4995 (±1216)
+S(%)
+79.0
+100.0
+84.0
+2
+Steps
+130.5
+60.4
+213.3
+D(m)
+1589 (±449)
+725 (±174)
+3718 (±1172)
+With Map-Surplus Utility (si,j, rs)
+S(%)
+97.0
+100.0
+35.0
+1
+Steps
+75.1
+46.4
+315.2
+D(m)
+1002 (±258)
+607 (±148)
+3652 (±1480)
+S(%)
+94.0
+100.0
+87.0
+2
+Steps
+91.0
+48.8
+185.8
+D(m)
+1212 (±424)
+581 (±128)
+2892 (±1128)
+TABLE III: Experimental results (signal strength).
+Model
+Time Efficiency ηT (m3/s) ↑
+Distance Efficiency ηD (m3/m) ↑
+2, 3, 4 robots (Indoor); 2,4,6, robots (Forest)
+Indoor
+8.9 (1.2)
+12.5 (1.9)
+12.8 (3.0)
+5.9 (0.7)
+8.6 (1.3)
+8.7 (1.8)
+Forest
+100.3 (20.1)
+143.7 (4.5)
+194.1 (28.7)
+56.6 (10.5)
+84.6 (4.9)
+124.3 (23.4)
+Campus
+41.8 (5.5)
+59.6 (1.1)
+60.5 (4.4)
+24.1 (3.2)
+35.6 (0.9)
+37.5 (2.4)
+through walls due to the significant decay in signal strength
+through such a medium. However, our signal strength model
+performs better in terms of time and distance efficiency in the
+Forest environment by at most 46.4% and 56.5% respectively,
+likely because robots can connect across a long distance as
+trees act as sparse obstacles. Lastly, the signal strength model
+outperforms the proximity model in the Campus environment
+in most cases. This is because robots can communicate across
+long distances in the central part of Campus, yet unable to
+communicate across the walkways blocked by buildings.
+D. Experimental Validation
+We conduct real-world experiments using three four-
+wheel differential-drive robots in a 25m × 10m obstacle-rich
+environment (Fig. 7). Each robot is equipped with an Ouster
+32-plane mapping lidar (up to 3.5m), and with a Doodlelab
+mesh radio that allows for information hopping using the
+proximity-based communication model (up to 3.0m). The
+robots executes their own decentralized policy using the same
+trained model used in Sec. V-B.2. Throughout the exploration
+mission, robots repeatedly disconnect and reconnect in an
+intelligent manner. A snapshot of each robot’s final merged
+sparse graph representations can be seen in Fig. 8.
+13251
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on September 23,2025 at 02:58:36 UTC from IEEE Xplore.  Restrictions apply. 
+Fig. 7: Illustration of real-world experimental setup.
+Fig. 8: Snapshot of the final merged graph representations towards
+the end of an exploration mission for robots 1 (red), 2 (green), and
+3 (blue), from left to right. The colored circles represent each of the
+robot’s graph nodes merged from other robots, the colored diamonds
+their belief positions, and blue trajectories their paths taken.
+VII. CONCLUSION
+In this paper, we present IR2, a deep reinforcement
+learning approach to information sharing for multi-robot
+exploration, particularly in large-scale environments with
+sparse and intermittent connectivity. IR2 leverages attention-
+based neural networks and curriculum learning to enable
+robots to effectively balance the longer-term trade-offs be-
+tween disconnecting for solo exploration and reconnecting for
+information sharing. We introduce a novel hierarchical graph
+formulation to achieve scalability to large-scale environments.
+Our experiments demonstrate the superiority of our approach
+against state-of-the-art preplanned and pursuit-based planners,
+especially in distance efficiency and map area standard
+deviation. This indicates strong collaboration to achieve high
+performance and equitable sharing of the exploration task.
+Future research will include studying the impact of more
+realistic communication models on planner performance by
+incorporating latency or data packet loss. In addition, while
+team-based preplanned rendezvous may be inefficient, we
+hope to explore subteam-based preplanned rendezvous. This
+means robots will also consider who should be part of the
+rendezvous agreement, to promote consistent information
+sharing while avoiding excessive backtracking. Finally, we
+hope to extend our 2D planner to 3D, in order to benchmark
+our work in more complicated and realistic environments.
+ACKNOWLEDGMENT
+This work was supported by Singapore Technologies
+Engineering Ltd, under the Economic Development Board -
+Industrial Postgraduate Program (Project No. 2022-2130).
+REFERENCES
+[1] A. P. Aguiar, J. Almeida, M. Bayat, et al., “Cooperative control of
+multiple marine vehicles theoretical challenges and practical issues,”
+IFAC Proceedings Volumes, vol. 42, no. 18, pp. 412–417, 2009, 8th
+IFAC Conference on Manoeuvring and Control of Marine Craft.
+[2] M. J. Schuster, S. G. Brunner, K. Bussmann, et al., “Towards
+autonomous planetary exploration,” Journal of Intelligent & Robotic
+Systems, vol. 93, pp. 461–494, 2019.
+[3] C. Papachristos, S. Khattak, F. Mascarich, et al., “Autonomous
+navigation and mapping in underground mines using aerial robots,” in
+2019 IEEE Aerospace Conference, 2019, pp. 1–8.
+[4] Y. Liu and G. Nejat, “Robotic urban search and rescue: A survey
+from the control perspective,” Journal of Intelligent & Robotic Systems,
+vol. 72, pp. 147–165, 2013.
+[5] T. Rappaport, Wireless Communications: Principles and Practice,
+2nd ed.
+Prentice Hall PTR, USA, 2001.
+[6] J. Yu, J. Tong, Y. Xu, et al., “Smmr-explore: Submap-based multi-
+robot exploration system with multi-robot multi-target potential field
+exploration method,” in 2021 IEEE ICRA, 2021, pp. 8779–8785.
+[7] W. Burgard, M. Moors, C. Stachniss, and F. Schneider, “Coordinated
+multi-robot exploration,” IEEE Transactions on Robotics, vol. 21, no. 3,
+pp. 376–386, 2005.
+[8] K. Masaba and A. Q. Li, “Gvgexp: Communication-constrained multi-
+robot exploration system based on generalized voronoi graphs,” in
+2021 MRS, 2021, pp. 146–154.
+[9] P. Mukhija, K. M. Krishna, and V. Krishna, “A two phase recursive
+tree propagation based multi-robotic exploration framework with fixed
+base station constraint,” in 2010 IEEE/RSJ IROS, 2010, pp. 4806–4811.
+[10] M. Saboia, L. Clark, V. Thangavelu, et al., “Achord: Communication-
+aware multi-robot coordination with intermittent connectivity,” IEEE
+RA-L, vol. 7, no. 4, pp. 10 184–10 191, 2022.
+[11] L. Bramblett, R. Peddi, and N. Bezzo, “Coordinated multi-agent
+exploration, rendezvous, & task allocation in unknown environments
+with limited connectivity,” in 2022 IEEE/RSJ IROS, 2022.
+[12] Y. Gao, Y. Wang, X. Zhong, et al., “Meeting-merging-mission: A multi-
+robot coordinate framework for large-scale communication-limited
+exploration,” in 2022 IEEE/RSJ IROS, 2022, pp. 13 700–13 707.
+[13] C. Cao, H. Zhu, Z. Ren, H. Choset, et al., “Representation granularity
+enables time-efficient autonomous exploration in large, complex worlds,”
+Science Robotics, vol. 8, no. 80, p. eadf0970, 2023.
+[14] M. Dorigo, G. Theraulaz, and V. Trianni, “Swarm robotics: Past, present,
+and future [point of view],” Proceedings of the IEEE, vol. 109, no. 7,
+pp. 1152–1165, 2021.
+[15] M. Kulkarni, M. Dharmadhikari, M. Tranzatto, et al., “Autonomous
+teamed exploration of subterranean environments using legged and
+aerial robots,” in 2022 ICRA, 2022, pp. 3306–3313.
+[16] C. Yu, X. Yang, J. Gao, et al., “Asynchronous multi-agent reinforcement
+learning for efficient real-time multi-robot cooperative exploration,” in
+Proceedings of the 2023 AAMAS, 2023.
+[17] T. Luo, B. Subagdja, D. Wang, et al., “Multi-agent collaborative
+exploration through graph-based deep reinforcement learning,” in 2019
+IEEE International Conference on Agents (ICA), 2019, pp. 2–7.
+[18] Y. Cao, T. Hou, Y. Wang, et al., “Ariadne: A reinforcement learning
+approach using attention-based deep networks for exploration,” in 2023
+IEEE ICRA, 2023, pp. 10 219–10 225.
+[19] A. Bonnefond, O. Simonin, and I. Guérin-Lassous, “Extension of
+flocking models to environments with obstacles and degraded commu-
+nications,” in 2021 IEEE/RSJ IROS, 2021, pp. 9139–9145.
+[20] F. A. Oliehoek and C. Amato, A Concise Introduction to Decentralized
+POMDPs, 1st ed.
+Springer Publishing Company, Incorporated, 2016.
+[21] Y. Cao, R. Zhao, Y. Wang, et al., “Deep reinforcement learning-based
+large-scale robot exploration,” IEEE RA-L, 2024.
+[22] A. Vaswani, N. M. Shazeer, N. Parmar, et al., “Attention is all you
+need,” in Neural Information Processing Systems, 2017.
+[23] O. Vinyals, M. Fortunato, and N. Jaitly, “Pointer networks,” in Advances
+in NIPS, C. Cortes, N. Lawrence, D. Lee, et al., Eds., vol. 28.
+Curran
+Associates, Inc., 2015.
+[24] S. Narvekar, B. Peng, M. Leonetti, et al., “Curriculum learning for
+reinforcement learning domains: A framework and survey,” J. Mach.
+Learn. Res., vol. 21, no. 1, jan 2020.
+[25] F. Chen, S. Bai, T. Shan, et al., Self-Learning Exploration and Mapping
+for Mobile Robots via Deep Reinforcement Learning, 2019.
+[26] P. Moritz, R. Nishihara, S. Wang, et al., “Ray: A distributed framework
+for emerging ai applications,” in Proceedings of the 13th USENIX
+Conference on Operating Systems Design and Implementation, 2018.
+[27] T. Haarnoja, A. Zhou, K. Hartikainen, et al., “Soft actor-critic
+algorithms and applications,” 2019.
+[28] A. Hornung, K. M. Wurm, M. Bennewitz, et al., “OctoMap: An efficient
+probabilistic 3D mapping framework based on octrees,” Autonomous
+Robots, 2013.
+[29] Y. Xu, J. Yu, J. Tang, et al., “Explore-bench: Data sets, metrics and
+evaluations for frontier-based and deep-reinforcement-learning-based
+autonomous exploration,” in 2022 ICRA.
+IEEE Press, 2022.
+13252
+Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on September 23,2025 at 02:58:36 UTC from IEEE Xplore.  Restrictions apply. 

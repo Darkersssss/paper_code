@@ -1,0 +1,137 @@
+===== PAPER 1 DETAILS =====
+25: module, combining linear global attention with local graph con-
+106: global attention with local graph convolution. This enables
+124: mative viewpoints. This mitigates over-squashing effects
+158: (GCNs) [14], Graph Attention Networks (GATs) [15], and
+160: navigation
+168: like Linear Transformers and Graph Linear Attention [18],
+178: that combines linear-complexity global attention with local
+199: ploration when feedback is rare [21]. Go-Explore [22] mitigates
+245: Graph-based inference framework: A lightweight encoder-decoder architecture combining linear global attention and local graph convolution efﬁciently generates
+246: embeddings, aggregates global context, and selects optimal viewpoints via an attention-guided action mask.
+298: We propose a scalable encoder–decoder framework for
+299: robotic exploration (Fig. 1). The encoder combines a linear
+300: global attention mechanism [19] with local graph convolutions
+302: time, while the decoder applies attention-based action selection
+306: B. Encoder
+307: We ﬁrst encode vertex attributes uv into a latent embedding
+311: The resulting embeddings, h(0) ∈RN×d, form the basis for
+317: ear global attention mechanism. Unlike conventional softmax
+318: attention with O(N 2) complexity [29], our method operates
+320: graphs. Speciﬁcally, given initial embeddings h(0), we compute
+344: the Frobenius norm. Node embeddings are updated efﬁciently
+363: balancing global attention and residual connections. This design
+368: graph adjacency matrix A, we fuse the global embeddings hg
+377: where GN(·) denotes a scalable GCN [14], α balances global
+378: attention and local connectivity, and the resulting embeddings
+380: v=1 serve as inputs to the decoder. This integration
+384: C. Decoder
+385: The decoder aims to produce a global graph-level embedding
+386: from the node-level embeddings ho. To intuitively aggregate
+387: global information, we adopt a global attention mechanism [29],
+388: in which the embedding of the robot’s current vertex hc ∈ho
+393: weighting node embeddings according to their relevance to
+396: sulting graph-level embedding hagg is then jointly utilized by
+421: Given the graph-level embedding hagg from the decoder, we
+422: employ a single-head attention mechanism to determine the next
+424: and candidate vertex embeddings:
+440: turns from the shared embedding hagg using a lightweight
+474: an encoder over heterogeneous graphs, where each node has
+475: a 6-dimensional feature embedded into a 64-dimensional latent
+476: space via a two-layer MLP. To improve generalization and stabi-
+479: position, which mitigates distribution shift and facilitates policy
+493: ment learning with attention-based policies, adaptively selecting
+564: Ablation study of global attention. Performance comparison of three
+565: variants: GCN-only, MHA-only, and Proposed. Our hybrid approach achieves
+567: D. Ablation Study of Global Attention
+568: To evaluate the role of global attention, we compare three ar-
+570: which integrates linear global attention and local GCN-based
+571: message passing; (2) the GCN-only variant, which removes
+572: global attention; and (3) the Multi-Head Attention (MHA)-only
+577: tency. The GCN-only variant struggles with large environments
+682: form, while the combination of linear global attention and local
+684: ity. A minimalist reward with curriculum learning mitigates
+737: graph roadmap: A sparse deterministic roadmap for safe 2D navigation
+747: “Graph attention networks,” in Proc. Int. Conf. Learn. Representations,
+755: RNNs: Fast autoregressive transformers with linear attention,” in Proc.
+787: [29] A. Vaswani et al., “Attention is all you need,” in Proc. Adv. Neural Inf.
+
+===== PAPER 2 DETAILS =====
+14: work that leverages graph attention networks, together with
+33: navigate and map unknown environments, with applications
+46: agent reinforcement learning with graph-based attention
+110: an attention-based neural network, with intelligent fusion of
+170: employs hierarchical self-attention mechanisms to capture
+213: attention. In the graphs, blue circles indicates the nodes that are connected by edges, indicates as tan lines. We also extract the frontiers
+252: attention-based policy and critic neural networks, along with
+305: improve the agent’s navigation ability, particularly when the
+321: viewpoints Ψt, our graph attention networks, parameterized
+345: Our policy network (Fig. 2) utilizes an encoder-decoder
+346: architecture with stacked masked attention. The encoder
+349: current location features, are fed to the decoder to generate
+351: Encoder: Our encoder leverages a sequence of masked
+352: self-attention layers to enhance the feature representations of
+354: the graph. We begin by applying a feed-forward layer to
+356: t into d-dimensional node
+367: back to d-dimensional space via a linear layer, to obtain
+369: N stacked self-attention layers (with N=6 in our implemen-
+370: tation), where each layer’s input is the output of the previous
+374: (i.e., attention weigh,t wij = 0, ∀(vi, vj) /∈Et). Despite
+375: restricted attention to neighboring nodes per layer, nodes
+376: progressively aggregate non-neighbor information through
+377: stacked self-attention. Unlike unmasked self-attention, our
+379: nections, enhancing path-finding. This enables the encoder
+382: attention depth N.
+383: Policy decoder: The decoder determines the final policy
+390: into an attention layer. This process refines the output ˜hc
+392: improve the decoder’s awareness of the local environment,
+400: This data is then processed through feed-forward layers to
+401: produce the corresponding embedding, hh
+410: to d-dimensional space via a feed-forward layer to get
+413: a single-head attention mechanism with ˜hc and its enhanced
+415: e , using the resulting attention scores
+566: Critic decoder: We developed our critic network, based
+569: network Qϕ, parameterized by ϕ, utilizes the same encoder
+571: decoder. During training, the critic receives full ground-
+574: ing. Using the enhanced node features ˜hn from the encoder,
+584: puted in the same manner as in the policy decoder. Finally,
+586: Qϕ(st, at) using a feed-forward layer. The networks are
+593: a maximum episode length of 128 steps, a discount factor
+614: complexity, frontiers will be gathered into multiple clusters.
+619: deep reinforcement learning with graph-based attention to
+630: where agents achieve 99% coverage within 128 timesteps.
+676: graph-based attention networks in learning spatial relation-
+682: length for task completion. In contrast, MARVEL’s attention-
+717: employs a graph attention network, with intelligent fusion
+860: automatic exploration for navigation in unknown environment,” IEEE
+920: “Actor-attention-critic
+
+===== PAPER 3 DETAILS =====
+17: for multi-robot exploration. Leveraging attention-based neural
+67: Fig. 1: Search-and-rescue robots collaborate to navigate uncharted
+112: we use an attention-based neural network trained by deep
+164: relied on attention-based neural networks to achieve long-
+184: in deciding where and when to gather during frontier-
+194: paper, we leverage attention-based neural network trained with
+241: strength attenuation that a signal encounters when propagated
+354: exploration and rendezvous. This augmented graph is fed into a similar encoder-decoder attention-based neural network architecture as [18].
+435: observation ot at every decision step, each robot’s attention-
+486: 1) Encoder: The encoder transforms the explored map into
+487: a multi-scale representation through multiple self-attention
+488: layers [22]. First, we embed augmented graph vertices V ′
+490: d-dimension feature vector hn
+499: compute the similarity matrix uij and the attention weights
+502: attention layer takes the output of the previous one as input.
+525: 2) Decoder: The decoder outputs a policy for the robot to
+528: features hn from the output of the encoder h′
+530: pass these features into a cross-attention layer, where hq = hc,
+533: hc and projected back into a d-dimension enhanced current
+535: a pointer layer [23] to output the robot policy.
+560: We train our attention-based neural network using the soft
+896: 581 (±128)
+897: 2892 (±1128)
+958: sparse and intermittent connectivity. IR2 leverages attention-
+992: navigation and mapping in underground mines using aerial robots,” in
+1010: tree propagation based multi-robotic exploration framework with fixed
+1037: approach using attention-based deep networks for exploration,” in 2023
+1047: [22] A. Vaswani, N. M. Shazeer, N. Parmar, et al., “Attention is all you

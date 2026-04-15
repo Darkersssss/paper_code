@@ -1,0 +1,467 @@
+===== PAPER 1 ENCODER/DECODER MATH =====
+306: B. Encoder
+307: We ﬁrst encode vertex attributes uv into a latent embedding
+308: h(0)
+309: v
+310: = ft(uv), where t = T(v), and ft is a type-speciﬁc MLP.
+311: The resulting embeddings, h(0) ∈RN×d, form the basis for
+312: subsequent computations.
+313: Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on October 29,2025 at 10:04:51 UTC from IEEE Xplore.  Restrictions apply.
+314: 12360
+315: IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 12, DECEMBER 2025
+316: To efﬁciently capture global interactions, we adopt a lin-
+317: ear global attention mechanism. Unlike conventional softmax
+318: attention with O(N 2) complexity [29], our method operates
+319: in linear time, O(N), enabling scalable reasoning on large
+320: graphs. Speciﬁcally, given initial embeddings h(0), we compute
+321: normalized query, key, and value matrices:
+322: Q = fQ
+323: 
+324: h(0)
+325: ,
+326: ˜Q =
+327: Q
+328: ∥Q∥F
+329: ,
+330: K = fK
+331: 
+332: h(0)
+333: ,
+334: ˜K =
+335: K
+336: ∥K∥F
+337: ,
+338: V = fV
+339: 
+340: h(0)
+341: ,
+342: (2)
+343: where fQ, fK, fV are linear transformations, and ∥· ∥F denotes
+344: the Frobenius norm. Node embeddings are updated efﬁciently
+345: using a diagonal normalization matrix D:
+346: D = diag
+347: 
+348: 1 + 1
+349: N
+350: ˜Q( ˜K⊤1)
+351: 
+352: ,
+353: (3)
+354: hg = βD−1
+355: 
+356: V + 1
+357: N
+358: ˜Q( ˜K⊤V)
+359: 
+360: + (1 −β)h(0),
+361: (4)
+362: where 1 ∈RN is an all-ones vector, and β is a hyperparameter
+363: balancing global attention and residual connections. This design
+364: effectively captures long-range dependencies while preserving
+365: localstructuralintegrity,makingitparticularlysuitableforlarge-
+366: scale graph-based exploration.
+367: To effectively incorporate local structural constraints from the
+368: graph adjacency matrix A, we fuse the global embeddings hg
+369: with local graph convolutional updates. Speciﬁcally, we employ
+370: a simple yet efﬁcient approach:
+371: ho = (1 −α) hg + α GN
+372: 
+373: h(0), A
+374: 
+375: ,
+376: (5)
+377: where GN(·) denotes a scalable GCN [14], α balances global
+378: attention and local connectivity, and the resulting embeddings
+379: ho = [hv]N
+380: v=1 serve as inputs to the decoder. This integration
+381: ensures the model simultaneously captures global structural
+382: relationships and local graph connectivity, enhancing inference
+383: quality for exploration tasks.
+384: C. Decoder
+385: The decoder aims to produce a global graph-level embedding
+386: from the node-level embeddings ho. To intuitively aggregate
+387: global information, we adopt a global attention mechanism [29],
+388: in which the embedding of the robot’s current vertex hc ∈ho
+389: naturally serves as the query:
+390: hagg = Attn(hc, ho).
+391: (6)
+392: This approach effectively summarizes the global context by
+393: weighting node embeddings according to their relevance to
+394: the robot’s current position, capturing essential structural and
+395: semantic information for subsequent decision-making. The re-
+396: sulting graph-level embedding hagg is then jointly utilized by
+397: the policy head to determine the next action and by the value
+398: Algorithm 1: Curriculum-Based PPO Training.
+399: 1:
+400: Input: total episodes N, PPO hyperparameters
+401: 2:
+402: Stage allocation: N × (0.625, 0.125, 0.125, 0.125)
+403: 3:
+404: Frequencies: (1: full, 2: 0.125 Hz, 3: 0.5 Hz, 4: 2 Hz)
+405: 4:
+406: for episode = 1 to N do
+407: 5:
+408: determine stage s by index; run episode with
+409: frequency of s
+410: 6:
+411: collect trajectories D, compute advantages with GAE
+412: 7:
+413: update policy πθ and value Vφ using PPO
+414: 8:
+415: end for
+416: 9:
+417: return trained policy πθ
+418: head to estimate expected returns, ensuring coherent exploration
+419: strategies.
+420: D. Action Selection and Value Estimation
+421: Given the graph-level embedding hagg from the decoder, we
+422: employ a single-head attention mechanism to determine the next
+423: action. Speciﬁcally, we compute relevance scores between hagg
+424: and candidate vertex embeddings:
+425: logits(v) = h⊤
+426: aggho[v],
+427: v ∈A,
+428: (7)
+429: where A denotes the set of feasible actions. Action probabilities
+430: are then obtained via softmax normalization.
+431: To improve learning efﬁciency and alleviate over-squashing
+432: in dense graphs, we introduce a viewpoint-based action mask.
+433: Unlike conventional adjacency-based masks, our method selec-
+434: tively retains only informative viewpoints—vertices expected
+435: to signiﬁcantly reveal unexplored areas—resulting in a compact
+436: and semantically meaningful action set. This targeted pruning
+437: accelerates policy convergence and enhances exploration effec-
+438: tiveness.
+439: Simultaneously, the value head estimates expected re-
+440: turns from the shared embedding hagg using a lightweight
+441: MLP. This shared representation facilitates joint optimiza-
+442: tion of immediate action quality and long-term explo-
+443: ration performance, improving both coherence and sample
+444: efﬁciency.
+445: E. RL With Curriculum Learning Strategy
+446: We train our exploration policy using Proximal Policy Op-
+447: timization (PPO) [30], a stable and efﬁcient reinforcement
+448: learning algorithm. To improve training stability and policy
+449: generalization, we employ a curriculum learning approach that
+450: progressively increases decision frequency during training. Ini-
+
+===== PAPER 2 ENCODER/DECODER DETAILS =====
+344: B. Network Architecture
+345: Our policy network (Fig. 2) utilizes an encoder-decoder
+346: architecture with stacked masked attention. The encoder
+347: refines node features in G′
+348: t, which, combined with the robot’s
+349: current location features, are fed to the decoder to generate
+350: waypoint-heading policies.
+351: Encoder: Our encoder leverages a sequence of masked
+352: self-attention layers to enhance the feature representations of
+353: each node by integrating information from other nodes within
+354: the graph. We begin by applying a feed-forward layer to
+355: transform the node properties in V ′
+356: t into d-dimensional node
+357: features hn
+358: 1. We apply 1D convolutions to Ft that encodes the
+359: frontier distribution for each node individually to get frontier
+360: features hn
+361: 2. This vector captures the node-specific frontier
+362: data, and extract local patterns and relationships within the
+363: node’s frontier distribution. The resulting node features hn
+364: 1
+365: and frontier features hn
+366: 2 are concatenated, then projected
+367: back to d-dimensional space via a linear layer, to obtain
+368: node features hn. These features are then processed through
+369: N stacked self-attention layers (with N=6 in our implemen-
+370: tation), where each layer’s input is the output of the previous
+371: one (i.e., hq = hk,v = hn). We apply a graph’s mask Mt,
+372: computed from the adjacency matrix of Et, to ensures that
+373: each node only attends to features of its neighboring nodes
+374: (i.e., attention weigh,t wij = 0, ∀(vi, vj) /∈Et). Despite
+375: restricted attention to neighboring nodes per layer, nodes
+376: progressively aggregate non-neighbor information through
+377: stacked self-attention. Unlike unmasked self-attention, our
+378: structured approach refines features iteratively via local con-
+379: nections, enhancing path-finding. This enables the encoder
+380: to transform hn into ˜hn, where node representations cap-
+381: ture broader graph dependencies influenced by Mt and the
+382: attention depth N.
+383: Policy decoder: The decoder determines the final policy
+384: using the enhanced node features ˜hn. From these features,
+385: we select the node at the robot’s current position as the
+386: query: hq = hc = ˜hn
+387: ψi(t). The current node features hc,
+388: along with neighboring node features from ˜hn
+389: e , are input
+390: into an attention layer. This process refines the output ˜hc
+391: by incorporating information from neighboring nodes. To
+392: improve the decoder’s awareness of the local environment,
+393: we compute two orientation-specific features for each vj: We
+394: first discretize the heading space into 36 uniform bins, where
+395: each bin represents a distinct heading. Then we compute
+396: a binary feature vector based on the heading space for
+397: each aq of vj, indicating whether the heading falls within
+398: the FoV centered on aq. The second is another 36-bin
+399: vector that tracks the previously explored headings of vj.
+400: This data is then processed through feed-forward layers to
+401: produce the corresponding embedding, hh
+402: a and hh
+403: e. Since ˜hn
+404: pertains solely to waypoints and does not include heading
+405: information, we replicate each neighboring node feature x
+406: times, to generate joint action pairs. Then, we concatenate
+407: the expanded ˜hn with hh
+408: a and hh
+409: e and then projected back
+410: to d-dimensional space via a feed-forward layer to get
+411: heading enhanced neighboring features ˜hn
+412: e . We then apply
+413: a single-head attention mechanism with ˜hc and its enhanced
+414: neighboring features ˜hn
+415: e , using the resulting attention scores
+416: directly as the final output policy πθ = (ai,t | oi,t) = wi,j.
+417: This policy guides the agent in selecting the next viewpoint
+418: (vj, aq). Its design removes the constraint of a fixed policy
+419: size, allowing dynamic adaptation to varying numbers of
+420: 11395
+421: Authorized licensed use limited to: SOUTH CHINA UNIVERSITY OF TECHNOLOGY. Downloaded on September 23,2025 at 02:58:34 UTC from IEEE Xplore.  Restrictions apply.
+422: TABLE I: Comparison with baseline multi-robot planners. We report the average and standard deviation of the trajectory length to
+423: complete exploration, to complete 90% exploration of the environment as well as the overlap ratio and sucess rate. All tests are conducted
+424: with 120◦FoV and sensor range ds = 10m. The downward and upward arrows indicate that lower and higher values are better respectively.
+425: Agents
+426: Metrics
+427: Nearest
+428: MMPF
+429: NBVP
+430: Learnt-Greedy
+431: MARVEL
+432: 2
+433: Trajectory Length. ↓
+434: 637.84(±103.85)
+435: 597.91(±123.12)
+436: 533.94(±91.63)
+437: 665.36(±134.11)
+438: 505.25(±89.03)
+439: 90% Coverage ↓
+440: 529.49(±96.97)
+441: 536.73(±115.03)
+442: 440.95(±88.20)
+443: 447.32(±106.44)
+444: 416.44(±84.62)
+445: Overlap Ratio ↓
+446: 0.684(±0.097)
+447: 0.023(±0.101)
+448: 0.113(±0.212)
+449: 0.081(±0.183)
+450: 0.048(±0.137)
+451: Success rate ↑
+452: 98
+453: 45
+454: 82
+455: 73
+456: 100
+457: 4
+458: Trajectory Length. ↓
+459: 417.92(±89.76)
+460: 427.30(±86.46)
+461: 416.50(±80.35)
+462: 433.03(±96.89)
+463: 357.5(±67.07)
+464: 90% Coverage ↓
+465: 346.50(±80.11)
+466: 358.56(±83.64)
+467: 329.75(±81.73)
+468: 318.46(±95.15)
+469: 294.21(±62.45)
+470: Overlap Ratio ↓
+471: 0.693(±0.096)
+472: 0.075(±0.143)
+473: 0.246(±0.214)
+474: 0.191(±0.187)
+475: 0.170(±0.169)
+476: Success rate ↑
+477: 99
+478: 95
+479: 100
+480: 92
+481: 100
+482: 8
+483: Trajectory Length. ↓
+484: 319.57(±73.66)
+485: 311.21(±74.89)
+486: 318.99(±59.40)
+487: 333.73(±109.30)
+488: 279.35(±50.63)
+489: 90% Coverage ↓
+490: 266.04(±69.99)
+491: 279.76(±65.51)
+492: 252.08(±56.19)
+493: 256.40(±67.84)
+494: 231.54(±46.40)
+495: Overlap Ratio ↓
+496: 0.671(±0.109)
+497: 0.172(±0.198)
+498: 0.401(±0.199)
+499: 0.306(±0.177)
+500: 0.316(±0.174)
+501: Success rate ↑
+502: 99
+503: 100
+504: 98
+505: 98
+506: 100
+507: TABLE II: Adaptability to different sensor’s FoV. All tests are conducted with 4 agents and sensor range ds = 10m.
+508: FoV
+509: Metrics
+510: Nearest
+511: MMPF
+512: NBVP
+513: Learnt-Greedy
+514: MARVEL
+515: 90◦
+516: Trajectory Length. ↓
+517: 414.64(±82.28)
+518: 472.92(±87.65)
+519: 455.28(±82.03)
+520: 511.77(±103.13)
+521: 378.99(±57.61)
+522: 90% Coverage ↓
+523: 347.46(±84.07)
+524: 388.45(±80.47)
+525: 362.53(±85.70)
+526: 366.97(±102.75)
+527: 313.67(±54.57)
+528: Overlap Ratio ↓
+529: 0.594(±0.125)
+530: 0.059(±0.130)
+531: 0.203(±0.199)
+532: 0.180(±0.181)
+533: 0.147(±0.155)
+534: Success rate ↑
+535: 97
+536: 90
+537: 98
+538: 94
+539: 100
+540: 180◦
+541: Trajectory Length. ↓
+542: 422.80(±108.04)
+543: 389.08(±89.53)
+544: 380.55(±84.31)
+545: 424.74(±105.14)
+546: 328.36(±61.31)
+547: 90% Coverage ↓
+548: 348.05(±95.57)
+549: 320.36(±70.86)
+550: 320.88(±83.17)
+551: 315.65(±83.23)
+552: 273.18(±59.95)
+553: Overlap Ratio ↓
+554: 0.807(±0.124)
+555: 0.098(±0.175)
+556: 0.321(±0.228)
+557: 0.216(±0.189)
+558: 0.207(±0.183)
+559: Success rate ↑
+560: 99
+561: 96
+562: 99
+563: 97
+564: 100
+565: neighboring nodes.
+566: Critic decoder: We developed our critic network, based
+567: on [33], to selectively extract pertinent information for each
+568: agent by incorporating other agents’ actions. The critic
+569: network Qϕ, parameterized by ϕ, utilizes the same encoder
+570: structure as the policy network πθ but features a distinct
+571: decoder. During training, the critic receives full ground-
+572: truth information, such as the entire map or graph (see
+573: Fig. 2), enhancing training stability through privileged learn-
+574: ing. Using the enhanced node features ˜hn from the encoder,
+575: we retrieve the features of other agents, ˜hn
+576: ψ−i(t), and their
+577: corresponding features at the next timestep, ˜hn
+578: ψ−i(t+1), based
+579: on their current actions at. These key-value pairs augment
+580: the current node feature hc with other agents’ actions, aiding
+581: credit assignment.. The enhanced current node features ˜hc
+582: are combined with enhanced neighboring features ˜hn
+583: e , com-
+584: puted in the same manner as in the policy decoder. Finally,
+585: these concatenated features are mapped to state-action values
+586: Qϕ(st, at) using a feed-forward layer. The networks are
+587: trained using soft actor-critic (SAC) algorithm [34].
+588: Training details: We use a training dataset of 5,663
+589: randomly generated large-scale maps (see Fig. 3) and an
+590: additional 100 unseen maps for testing. Each environment
+591: measures 90m by 90m with 4 agents, a sensor range of
+592: ds = 10m, and a 120◦FoV. Training parameters include
+593: a maximum episode length of 128 steps, a discount factor
+594: of γ = 1, a batch size of 256, and an episode buffer size of
+595: 10,000. Training begins after 2,000 steps, with target entropy
+596: 0.01·log(k), one update per step, and Adam optimizer (10−5
+597: LR). The target critic updates every 256 steps. Complete
+598: code and model are available at https://github.com/
+599: marmotlab/MARVEL.
+600: V. EXPERIMENTS
+
+===== PAPER 3 ENCODER/DECODER DETAILS =====
+486: 1) Encoder: The encoder transforms the explored map into
+487: a multi-scale representation through multiple self-attention
+488: layers [22]. First, we embed augmented graph vertices V ′
+489: i into
+490: d-dimension feature vector hn
+491: i . As seen in Eq. (4), we obtain
+492: the query, key, and value vectors qi, ki, and vi by multiplying
+493: their feature vectors hq
+494: i = hk
+495: i = hv
+496: i = hn
+497: i with their learnable
+498: weight matrices W Q, W K, and W V respectively. We then
+499: compute the similarity matrix uij and the attention weights
+500: wij to obtain the enhanced node feature h′
+501: i. Note that each
+502: attention layer takes the output of the previous one as input.
+503: qi = W Qhq
+504: i ,
+505: ki = W Khk
+506: i ,
+507: vi = W V hv
+508: i
+509: uij = qT
+510: i · kj
+511: √
+512: d
+513: ,
+514: wij =
+515: euij
+516: Pn
+517: j=1 euij ,
+518: h′
+519: i =
+520: n
+521: X
+522: j=1
+523: wijvj
+524: (4)
+525: 2) Decoder: The decoder outputs a policy for the robot to
+526: act upon. We first extract the current node features hc based on
+527: the current robot position and its connected neighboring node
+528: features hn from the output of the encoder h′
+529: i. Thereafter, we
+530: pass these features into a cross-attention layer, where hq = hc,
+531: hk = hn, and hv = hn. Similar to Eq. (4), we eventually
+532: obtain the output feature vector. It is then concatenated with
+533: hc and projected back into a d-dimension enhanced current
+534: node feature vector ˆhc. Finally, we pass both ˆhc and hn into
+535: a pointer layer [23] to output the robot policy.
+536: B. Training
+537: 1) Curriculum Learning: We develop a curriculum [24] to
+538: allow robots to learn complex information-sharing strategies
+539: incrementally. Our training data contains four types of maps,
+540: namely Simple, Corridor (160m × 120m), Hybrid (125m ×
+541: 125m), and Complex maps (250m×250m). We obtain Simple
+542: maps from an open-source data set [25], and custom-generated
+543: datasets for the remaining maps (Fig. 6).
+544: Given these maps, we develop a curriculum to train robots
+545: in two stages - the first with an easy training set, and the
